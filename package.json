@@ -50,6 +50,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.52.0",
+    "@hookform/resolvers": "^3.3.4",
+    "lucide-react": "^0.344.0",
     "simple-git": "^3.22.1",
     "sqlite3": "^5.1.6",
     "zod": "^3.23.8"
