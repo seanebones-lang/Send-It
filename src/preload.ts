@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     status: () => ipcRenderer.invoke('deploy:status'),
     logs: () => ipcRenderer.invoke('deploy:logs'),
   },
+  repo: {
+    // Repository-related IPC methods
+    clone: (repoUrl: string, targetPath?: string) => ipcRenderer.invoke('repo:clone', repoUrl, targetPath),
+    analyzeFramework: (repoPath: string, repoUrl?: string) => ipcRenderer.invoke('repo:analyzeFramework', repoPath, repoUrl),
+  },
 });

@@ -1,10 +1,80 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
+import simpleGit, { SimpleGit } from 'simple-git';
+import { Database } from './database';
+import { FrameworkDetector } from './frameworkDetector';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
+
+// Initialize database after app is ready
+let db: Database | null = null;
+
+app.whenReady().then(() => {
+  db = new Database();
+});
+
+// IPC Handlers
+ipcMain.handle('repo:clone', async (_event, repoUrl: string, targetPath?: string) => {
+  try {
+    const reposDir = path.join(app.getPath('userData'), 'repos');
+    if (!fs.existsSync(reposDir)) {
+      fs.mkdirSync(reposDir, { recursive: true });
+    }
+
+    const repoName = repoUrl.split('/').pop()?.replace('.git', '') || 'repo';
+    const clonePath = targetPath || path.join(reposDir, repoName);
+
+    // Remove existing directory if it exists
+    if (fs.existsSync(clonePath)) {
+      fs.rmSync(clonePath, { recursive: true, force: true });
+    }
+
+    const git: SimpleGit = simpleGit();
+    await git.clone(repoUrl, clonePath);
+
+    return { success: true, path: clonePath };
+  } catch (error) {
+    console.error('Error cloning repo:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle('repo:analyzeFramework', async (_event, repoPath: string, repoUrl?: string) => {
+  try {
+    if (!fs.existsSync(repoPath)) {
+      return { success: false, error: 'Repository path does not exist' };
+    }
+
+    const detection = FrameworkDetector.detect(repoPath);
+    
+    // Persist to SQLite
+    if (repoUrl && db) {
+      await db.saveAnalysis({
+        repoUrl,
+        repoPath,
+        framework: detection.framework,
+        scores: JSON.stringify(detection.scores),
+        analyzedAt: new Date().toISOString(),
+      });
+    }
+
+    return {
+      success: true,
+      framework: detection.framework,
+      scores: detection.scores,
+    };
+  } catch (error) {
+    console.error('Error analyzing framework:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 const createWindow = (): void => {
   // Create the browser window.
@@ -51,6 +121,12 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  if (db) {
+    db.close();
   }
 });
 
