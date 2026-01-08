@@ -28,6 +28,7 @@
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@types/simple-git": "^3.0.3",
+    "@types/better-sqlite3": "^7.6.8",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "css-loader": "^6.8.1",
@@ -54,6 +55,8 @@
     "lucide-react": "^0.344.0",
     "simple-git": "^3.22.1",
     "sqlite3": "^5.1.6",
+    "better-sqlite3": "^11.3.0",
+    "keytar": "^7.9.0",
     "zod": "^3.23.8"
   }
 }

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { DeployConfig, Platform, QueueItem, LogMessage } from './types/ipc';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -14,10 +15,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   deploy: {
     // Deploy-related IPC methods
-    start: (config?: unknown) => ipcRenderer.invoke('deploy:start', config),
-    stop: () => ipcRenderer.invoke('deploy:stop'),
-    status: () => ipcRenderer.invoke('deploy:status'),
-    logs: () => ipcRenderer.invoke('deploy:logs'),
+    queue: (config: DeployConfig) => ipcRenderer.invoke('deploy:queue', config),
+    status: (deploymentId: string) => ipcRenderer.invoke('deploy:status', deploymentId),
+    logs: (deploymentId: string) => ipcRenderer.invoke('deploy:logs', deploymentId),
+    queueList: () => ipcRenderer.invoke('deploy:queue:list'),
+    onLog: (callback: (log: LogMessage) => void) => {
+      ipcRenderer.on('deploy:log', (_event, log: LogMessage) => callback(log));
+      return () => ipcRenderer.removeAllListeners('deploy:log');
+    },
+    onStatus: (callback: (data: { id: string; status: string; result?: unknown }) => void) => {
+      ipcRenderer.on('deploy:status', (_event, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('deploy:status');
+    },
+  },
+  token: {
+    // Token management IPC methods
+    get: (platform: Platform) => ipcRenderer.invoke('token:get', platform),
+    set: (platform: Platform, token: string) => ipcRenderer.invoke('token:set', platform, token),
   },
   repo: {
     // Repository-related IPC methods
