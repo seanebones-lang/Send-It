@@ -12,6 +12,7 @@ import * as path from 'path';
 import { app } from 'electron';
 import type { QueueItem, DeployConfig, DeployResult, DeployPlatform } from '../types/ipc';
 import { encryptEnvVars, decryptEnvVars } from '../utils/encryption';
+import { startTimer } from '../utils/performanceMonitor';
 
 /**
  * Cache entry for query results
@@ -44,7 +45,7 @@ export class DatabaseService {
   /**
    * Gets a cached result or executes the query and caches it
    */
-  private getCachedOrExecute<T>(cacheKey: string, queryFn: () => T, ttl: number = this.defaultCacheTTL): T {
+  private async getCachedOrExecute<T>(cacheKey: string, queryFn: () => T | Promise<T>, ttl: number = this.defaultCacheTTL): Promise<T> {
     const cached = this.queryCache.get(cacheKey);
     const now = Date.now();
     
@@ -52,7 +53,7 @@ export class DatabaseService {
       return cached.data;
     }
     
-    const data = queryFn();
+    const data = await Promise.resolve(queryFn());
     this.queryCache.set(cacheKey, {
       data,
       expiresAt: now + ttl,
@@ -160,17 +161,17 @@ export class DatabaseService {
    * @param config - Deployment configuration
    * @param status - Deployment status
    */
-  saveDeployment(
+  async saveDeployment(
     deploymentId: string,
     config: DeployConfig,
     status: 'queued' | 'processing' | 'completed' | 'failed'
-  ): void {
+  ): Promise<void> {
     if (!this.deployDb) {
       throw new Error('Database not initialized');
     }
 
     // Encrypt env vars before storing
-    const encryptedEnvVars = encryptEnvVars(config.envVars);
+    const encryptedEnvVars = await encryptEnvVars(config.envVars);
 
     this.deployDb
       .prepare(
@@ -263,7 +264,7 @@ export class DatabaseService {
    * @param deploymentId - Deployment ID
    * @returns QueueItem or null if not found
    */
-  getDeployment(deploymentId: string): QueueItem | null {
+  async getDeployment(deploymentId: string): Promise<QueueItem | null> {
     if (!this.deployDb) {
       return null;
     }
@@ -279,7 +280,7 @@ export class DatabaseService {
     // Decrypt env vars
     let envVars: Record<string, string> = {};
     try {
-      envVars = decryptEnvVars(JSON.parse(row.env_vars));
+      envVars = await decryptEnvVars(JSON.parse(row.env_vars));
     } catch (error) {
       console.error('Error decrypting env vars:', error);
     }
@@ -316,22 +317,23 @@ export class DatabaseService {
    * @param offset - Number of deployments to skip (default: 0)
    * @returns Array of deployment items
    */
-  getAllDeployments(limit: number = 100, offset: number = 0): QueueItem[] {
+  async getAllDeployments(limit: number = 100, offset: number = 0): Promise<QueueItem[]> {
     if (!this.deployDb) {
       return [];
     }
 
     const cacheKey = `getAllDeployments:${limit}:${offset}`;
-    return this.getCachedOrExecute(cacheKey, () => {
+    return this.getCachedOrExecute(cacheKey, async () => {
       const rows = this.deployDb!
         .prepare('SELECT * FROM deployments ORDER BY created_at DESC LIMIT ? OFFSET ?')
         .all(limit, offset) as any[];
 
-      return rows.map((row) => {
+      // Decrypt all env vars in parallel
+      const decryptedRows = await Promise.all(rows.map(async (row) => {
       // Decrypt env vars
       let envVars: Record<string, string> = {};
       try {
-        envVars = decryptEnvVars(JSON.parse(row.env_vars));
+        envVars = await decryptEnvVars(JSON.parse(row.env_vars));
       } catch (error) {
         console.error('Error decrypting env vars:', error);
       }
@@ -359,7 +361,8 @@ export class DatabaseService {
         startedAt: row.started_at || undefined,
         completedAt: row.completed_at || undefined,
       };
-      });
+      }));
+      return decryptedRows;
     });
   }
 
@@ -369,22 +372,23 @@ export class DatabaseService {
    * @param status - Status to filter by
    * @returns Array of deployment items
    */
-  getDeploymentsByStatus(status: 'queued' | 'processing' | 'completed' | 'failed'): QueueItem[] {
+  async getDeploymentsByStatus(status: 'queued' | 'processing' | 'completed' | 'failed'): Promise<QueueItem[]> {
     if (!this.deployDb) {
       return [];
     }
 
     const cacheKey = `getDeploymentsByStatus:${status}`;
-    return this.getCachedOrExecute(cacheKey, () => {
+    return this.getCachedOrExecute(cacheKey, async () => {
       const rows = this.deployDb!
         .prepare('SELECT * FROM deployments WHERE status = ? ORDER BY created_at DESC')
         .all(status) as any[];
 
-      return rows.map((row) => {
+      // Decrypt all env vars in parallel
+      const decryptedRows = await Promise.all(rows.map(async (row) => {
       // Decrypt env vars
       let envVars: Record<string, string> = {};
       try {
-        envVars = decryptEnvVars(JSON.parse(row.env_vars));
+        envVars = await decryptEnvVars(JSON.parse(row.env_vars));
       } catch (error) {
         console.error('Error decrypting env vars:', error);
       }
@@ -412,7 +416,8 @@ export class DatabaseService {
         startedAt: row.started_at || undefined,
         completedAt: row.completed_at || undefined,
       };
-      });
+      }));
+      return decryptedRows;
     });
   }
 

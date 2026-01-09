@@ -206,7 +206,7 @@ ipcMain.handle('deploy:queue', async (_event, config: DeployConfig) => {
 });
 
 ipcMain.handle('deploy:status', async (_event, deploymentId: string) => {
-  const item = QueueService.getInstance().getDeployment(deploymentId);
+  const item = await QueueService.getInstance().getDeployment(deploymentId);
   if (item) {
     return {
       id: item.id,
@@ -225,7 +225,7 @@ ipcMain.handle('deploy:logs', async (_event, deploymentId: string) => {
 });
 
 ipcMain.handle('deploy:queue:list', async () => {
-  return QueueService.getInstance().getAllDeployments();
+  return await QueueService.getInstance().getAllDeployments();
 });
 
 ipcMain.handle('repo:clone', async (_event, repoUrl: string, targetPath?: string) => {
@@ -353,7 +353,7 @@ app.whenReady().then(async () => {
   deploymentService.setLogService(logService);
   
   queueService = QueueService.getInstance();
-  queueService.initialize({ maxConcurrent: 3, parallel: true });
+  await queueService.initialize({ maxConcurrent: 3, parallel: true });
   
   // Create window
   mainWindow = createWindow();

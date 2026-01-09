@@ -300,15 +300,18 @@ export function StepEnv() {
                     ? 'Token authenticated via OAuth'
                     : `Enter ${fieldName}`
                 }
+                aria-invalid={errors[fieldName as keyof typeof errors] ? 'true' : 'false'}
+                aria-describedby={errors[fieldName as keyof typeof errors] ? `${fieldName}-error` : descriptions[fieldName] ? `${fieldName}-description` : undefined}
+                aria-disabled={hasToken && (isVercelToken || isRailwayToken)}
               />
               {descriptions[fieldName] && (
-                <div className="mt-2 flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div id={`${fieldName}-description`} className="mt-2 flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg" role="note">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
                   <p className="text-sm text-blue-600 dark:text-blue-400">{descriptions[fieldName]}</p>
                 </div>
               )}
               {errors[fieldName as keyof typeof errors] && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                <p id={`${fieldName}-error`} className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
                   {errors[fieldName as keyof typeof errors]?.message as string}
                 </p>
               )}

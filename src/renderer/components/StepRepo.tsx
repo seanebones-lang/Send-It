@@ -108,10 +108,12 @@ export function StepRepo() {
                 : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2`}
             disabled={isSubmitting || state.loading}
+            aria-invalid={errors.repoUrl ? 'true' : 'false'}
+            aria-describedby={errors.repoUrl ? 'repoUrl-error' : undefined}
           />
           {errors.repoUrl && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-              <AlertCircle className="w-4 h-4" />
+            <p id="repoUrl-error" className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+              <AlertCircle className="w-4 h-4" aria-hidden="true" />
               {errors.repoUrl.message}
             </p>
           )}
@@ -146,6 +148,7 @@ export function StepRepo() {
           type="submit"
           disabled={isSubmitting || state.loading}
           className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          aria-busy={isSubmitting || state.loading}
         >
           {isSubmitting || state.loading ? (
             <>

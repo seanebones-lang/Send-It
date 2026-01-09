@@ -122,7 +122,7 @@ export class DeploymentService {
 
     try {
       // Decrypt env vars before deployment
-      const decryptedEnvVars = decryptEnvVars(config.envVars);
+      const decryptedEnvVars = await decryptEnvVars(config.envVars);
 
       const tokenResult = await this.tokenService.getToken('vercel');
       if (!tokenResult.success || !tokenResult.token) {

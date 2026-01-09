@@ -15,6 +15,7 @@ import { DeploymentService } from './DeploymentService';
 import { LogService } from './LogService';
 import { NotificationService } from './NotificationService';
 import { encryptEnvVars } from '../utils/encryption';
+import { startTimer } from '../utils/performanceMonitor';
 
 /**
  * Configuration for queue processing
@@ -64,21 +65,21 @@ export class QueueService {
    * 
    * @param config - Queue configuration
    */
-  initialize(config: QueueConfig = {}): void {
+  async initialize(config: QueueConfig = {}): Promise<void> {
     this.maxConcurrent = config.maxConcurrent || 3;
     this.parallel = config.parallel !== false;
 
     // Load pending deployments from database on startup
-    this.loadPendingDeployments();
+    await this.loadPendingDeployments();
   }
 
   /**
    * Loads pending deployments from database on startup
    */
-  private loadPendingDeployments(): void {
+  private async loadPendingDeployments(): Promise<void> {
     try {
-      const pending = this.databaseService.getDeploymentsByStatus('queued');
-      const processing = this.databaseService.getDeploymentsByStatus('processing');
+      const pending = await this.databaseService.getDeploymentsByStatus('queued');
+      const processing = await this.databaseService.getDeploymentsByStatus('processing');
 
       // Re-queue pending and processing deployments (in case of crash)
       [...pending, ...processing].forEach((item) => {
@@ -107,7 +108,7 @@ export class QueueService {
     const id = deploymentId || `deploy_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // Encrypt env vars before storing
-    const encryptedEnvVars = encryptEnvVars(config.envVars);
+    const encryptedEnvVars = await encryptEnvVars(config.envVars);
     const configWithEncrypted = { ...config, envVars: encryptedEnvVars };
 
     const item: QueueItem = {
@@ -131,7 +132,7 @@ export class QueueService {
     );
 
     // Store in database with encrypted env vars
-    this.databaseService.saveDeployment(id, configWithEncrypted, 'queued');
+    await this.databaseService.saveDeployment(id, configWithEncrypted, 'queued');
 
     // Start processing queue
     this.processDeploymentQueue().catch((error) => {
@@ -148,7 +149,7 @@ export class QueueService {
    * @param deploymentId - Deployment ID
    * @returns QueueItem or null if not found
    */
-  getDeployment(deploymentId: string): QueueItem | null {
+  async getDeployment(deploymentId: string): Promise<QueueItem | null> {
     // First check in-memory queue
     const queueItem = this.deployQueue.find((item) => item.id === deploymentId);
     if (queueItem) {
@@ -156,7 +157,7 @@ export class QueueService {
     }
 
     // Check database
-    return this.databaseService.getDeployment(deploymentId);
+    return await this.databaseService.getDeployment(deploymentId);
   }
 
   /**
@@ -164,11 +165,11 @@ export class QueueService {
    * 
    * @returns Array of queue items
    */
-  getAllDeployments(): QueueItem[] {
+  async getAllDeployments(): Promise<QueueItem[]> {
     const queueItems = [...this.deployQueue];
 
     // Also get from database (may have items not in memory)
-    const dbItems = this.databaseService.getAllDeployments(100);
+    const dbItems = await this.databaseService.getAllDeployments(100);
     dbItems.forEach((dbItem) => {
       if (!queueItems.find((item) => item.id === dbItem.id)) {
         queueItems.push(dbItem);
@@ -274,6 +275,7 @@ export class QueueService {
    * Processes a single deployment item
    */
   private async processDeploymentItem(item: QueueItem): Promise<void> {
+    const stopTimer = startTimer('deployment.process', { platform: item.config.platform });
     try {
       item.status = 'processing';
       item.startedAt = new Date().toISOString();
@@ -356,6 +358,8 @@ export class QueueService {
         `${item.config.platform} deployment failed: ${item.result.error}`,
         'error'
       );
+    } finally {
+      stopTimer();
     }
   }
 

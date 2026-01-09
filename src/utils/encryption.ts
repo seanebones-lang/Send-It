@@ -14,6 +14,7 @@ import * as crypto from 'crypto';
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as keytar from 'keytar';
 
 /**
  * Minimum PBKDF2 iterations per NIST SP 800-132
@@ -43,25 +44,52 @@ function deriveKey(masterPassword: string, salt: Buffer): Buffer {
   );
 }
 
+const SERVICE_NAME = 'send-it';
+const MASTER_KEY_ACCOUNT = 'encryption-master-key';
+
 /**
  * Gets or creates a secure master key for encryption
- * Uses app name + secure storage location
- * In production, consider using hardware security module (HSM) or secure enclave
+ * Stores master key in OS keychain for security
+ * Falls back to legacy method for backwards compatibility
  * 
  * @returns Master key string
  */
-function getMasterKey(): string {
-  // Use app name + user data path for uniqueness
-  // In a production system, consider:
-  // - Using OS keychain to store a generated key
-  // - Using hardware security module (HSM)
-  // - Using secure enclave on macOS/iOS
+async function getMasterKey(): Promise<string> {
+  try {
+    // Try to get master key from OS keychain
+    let masterKey = await keytar.getPassword(SERVICE_NAME, MASTER_KEY_ACCOUNT);
+    
+    if (!masterKey) {
+      // Generate new secure random master key (256 bits)
+      masterKey = crypto.randomBytes(32).toString('hex');
+      
+      // Store in OS keychain
+      try {
+        await keytar.setPassword(SERVICE_NAME, MASTER_KEY_ACCOUNT, masterKey);
+      } catch (keychainError) {
+        // If keychain fails, fall back to legacy method
+        console.warn('Failed to store master key in keychain, using legacy method:', keychainError);
+        return getMasterKeyLegacy();
+      }
+    }
+    
+    return masterKey;
+  } catch (error) {
+    // If keychain access fails, fall back to legacy method
+    console.warn('Keychain access failed, using legacy master key method:', error);
+    return getMasterKeyLegacy();
+  }
+}
+
+/**
+ * Legacy master key derivation (for backwards compatibility)
+ * Uses app name + user data path
+ * 
+ * @returns Legacy master key string
+ */
+function getMasterKeyLegacy(): string {
   const appName = app.getName();
   const userDataPath = app.getPath('userData');
-  
-  // For now, use app identifier - in production, generate and store securely
-  // This is better than hardcoded salt but still not ideal
-  // TODO: Generate and store master key in OS keychain on first run
   return `${appName}:${userDataPath}`;
 }
 
@@ -74,9 +102,9 @@ function getMasterKey(): string {
  * @returns Encrypted string in format "salt:iv:authTag:encrypted"
  * @throws {Error} If encryption fails
  */
-export function encryptEnvVar(value: string): string {
+export async function encryptEnvVar(value: string): Promise<string> {
   try {
-    const masterKey = getMasterKey();
+    const masterKey = await getMasterKey();
     
     // Generate random salt and IV for each encryption
     const salt = crypto.randomBytes(SALT_LENGTH);
@@ -109,7 +137,7 @@ export function encryptEnvVar(value: string): string {
  * @returns Decrypted plaintext value
  * @throws {Error} If decryption fails or data is tampered
  */
-export function decryptEnvVar(encrypted: string): string {
+export async function decryptEnvVar(encrypted: string): Promise<string> {
   try {
     const parts = encrypted.split(':');
     
@@ -128,7 +156,7 @@ export function decryptEnvVar(encrypted: string): string {
       throw new Error('Invalid encrypted data: incorrect length for salt, IV, or auth tag');
     }
     
-    const masterKey = getMasterKey();
+    const masterKey = await getMasterKey();
     
     // Derive the same key using the stored salt
     const key = deriveKey(masterKey, salt);
@@ -150,7 +178,7 @@ export function decryptEnvVar(encrypted: string): string {
     
     // Attempt legacy decryption for backwards compatibility
     try {
-      return decryptEnvVarLegacy(encrypted);
+      return await decryptEnvVarLegacy(encrypted);
     } catch (legacyError) {
       throw new Error(
         `Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
@@ -166,7 +194,7 @@ export function decryptEnvVar(encrypted: string): string {
  * 
  * @deprecated This is for migrating old encrypted data. New data should use PBKDF2.
  */
-function decryptEnvVarLegacy(encrypted: string): string {
+async function decryptEnvVarLegacy(encrypted: string): Promise<string> {
   const parts = encrypted.split(':');
   
   if (parts.length !== 3) {
@@ -199,12 +227,12 @@ function decryptEnvVarLegacy(encrypted: string): string {
  * @param envVars - Object with key-value pairs to encrypt
  * @returns Object with encrypted values
  */
-export function encryptEnvVars(envVars: Record<string, string>): Record<string, string> {
+export async function encryptEnvVars(envVars: Record<string, string>): Promise<Record<string, string>> {
   const encrypted: Record<string, string> = {};
   
   for (const [key, value] of Object.entries(envVars)) {
     try {
-      encrypted[key] = encryptEnvVar(value);
+      encrypted[key] = await encryptEnvVar(value);
     } catch (error) {
       console.error(`Error encrypting ${key}:`, error);
       throw new Error(`Failed to encrypt environment variable ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -220,12 +248,12 @@ export function encryptEnvVars(envVars: Record<string, string>): Record<string, 
  * @param encrypted - Object with encrypted values
  * @returns Object with decrypted values
  */
-export function decryptEnvVars(encrypted: Record<string, string>): Record<string, string> {
+export async function decryptEnvVars(encrypted: Record<string, string>): Promise<Record<string, string>> {
   const decrypted: Record<string, string> = {};
   
   for (const [key, value] of Object.entries(encrypted)) {
     try {
-      decrypted[key] = decryptEnvVar(value);
+      decrypted[key] = await decryptEnvVar(value);
     } catch (error) {
       console.error(`Error decrypting ${key}:`, error);
       // Don't throw - log and continue for backwards compatibility

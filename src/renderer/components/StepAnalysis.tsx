@@ -95,6 +95,8 @@ export function StepAnalysis() {
                     ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 } bg-white dark:bg-gray-800 transition-all text-left`}
+                aria-pressed={state.selectedPlatform === platform}
+                aria-label={`Select ${platformNames[platform]} platform (score: ${score})`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${platformColors[platform]}`}>
@@ -196,6 +198,7 @@ export function StepAnalysis() {
           onClick={nextStep}
           disabled={!state.selectedPlatform}
           className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          aria-disabled={!state.selectedPlatform}
         >
           Continue
           <ArrowRight className="w-5 h-5" />
