@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { motion } from 'framer-motion';
 import { useWizard } from '../contexts/WizardContext';
 import { useRepositoryAnalysis } from '../hooks/useRepositoryAnalysis';
 import { useAnalysisHistory } from '../hooks/useAnalysisHistory';
@@ -97,12 +98,25 @@ export function StepRepo() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="glass-dark rounded-2xl p-8 shadow-2xl mb-6">
+    <motion.div 
+      className="w-full max-w-6xl mx-auto"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <motion.div 
+        className="glass-dark rounded-2xl p-8 shadow-2xl mb-6"
+        whileHover={{ scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 300 }}
+      >
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+          <motion.div 
+            className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
             <GitBranch className="w-7 h-7 text-white" />
-          </div>
+          </motion.div>
           <div>
             <h2 className="text-3xl font-bold text-white mb-1">Repository Analysis</h2>
             <p className="text-gray-300">
@@ -110,11 +124,16 @@ export function StepRepo() {
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Example Repositories - Premium Design */}
       {showExamples && !data && (
-        <div className="glass-dark rounded-2xl p-8 shadow-2xl mb-6">
+        <motion.div 
+          className="glass-dark rounded-2xl p-8 shadow-2xl mb-6"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
@@ -134,12 +153,16 @@ export function StepRepo() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {exampleRepositories.map((example, index) => (
-              <button
+              <motion.button
                 key={example.id}
                 type="button"
                 onClick={() => handleExampleClick(example)}
-                className={`relative p-6 rounded-xl bg-gradient-to-br ${example.color} text-white hover:scale-105 hover:shadow-2xl transition-all-smooth text-left group overflow-hidden`}
-                style={{animationDelay: `${index * 0.1}s`}}
+                className={`relative p-6 rounded-xl bg-gradient-to-br ${example.color} text-white text-left group overflow-hidden`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1, duration: 0.4 }}
+                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(0,0,0,0.3)" }}
+                whileTap={{ scale: 0.98 }}
               >
                 <div className="relative z-10">
                   <div className="flex items-start justify-between mb-3">
@@ -158,7 +181,7 @@ export function StepRepo() {
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-              </button>
+              </motion.button>
             ))}
           </div>
           <div className="mt-6 glass rounded-xl p-4 border border-blue-400/30">
@@ -167,7 +190,7 @@ export function StepRepo() {
               <strong>Pro tip:</strong> Real repository analysis with live framework detection and platform scoring
             </p>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Recent Analysis History */}
@@ -318,25 +341,61 @@ export function StepRepo() {
 
         {/* Success State */}
         {data && data.cloneResult?.success && data.analysisResult?.success && (
-          <div className="space-y-3">
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <p className="text-sm text-green-600 dark:text-green-400">
-                ✓ Repository cloned successfully to: {data.cloneResult.path}
-              </p>
-            </div>
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-600 dark:text-blue-400">
-                ✓ Framework detected: <span className="font-semibold">{data.analysisResult.framework}</span>
-              </p>
-            </div>
-            <button
+          <motion.div 
+            className="space-y-3"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <motion.div 
+              className="glass-dark rounded-xl p-6 border-2 border-green-400/50"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                  <span className="text-white text-xl">✓</span>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">Repository Analyzed</p>
+                  <p className="text-sm text-gray-300">
+                    {data.cloneResult.path}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div 
+              className="glass-dark rounded-xl p-6 border-2 border-blue-400/50"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                  <span className="text-white text-xl">🎯</span>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">Framework Detected</p>
+                  <p className="text-lg text-blue-400 font-bold">
+                    {data.analysisResult.framework}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+            <motion.button
               type="button"
               onClick={handleContinue}
-              className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
             >
-              Continue to Analysis
-            </button>
-          </div>
+              Continue to Analysis →
+            </motion.button>
+          </motion.div>
         )}
 
         {/* Submit Button - Only show if no data yet */}
@@ -361,6 +420,6 @@ export function StepRepo() {
           </button>
         )}
       </form>
-    </div>
+    </motion.div>
   );
 }
