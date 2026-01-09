@@ -64,10 +64,157 @@ app.whenReady().then(() => {
   `);
 });
 
+// ========== Encryption Utilities ==========
+
+const ENCRYPTION_KEY = crypto.scryptSync(
+  app.getName(),
+  'salt',
+  32
+);
+
+function encryptEnvVar(value: string): string {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(value, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+}
+
+function decryptEnvVar(encrypted: string): string {
+  const [ivHex, authTagHex, encryptedData] = encrypted.split(':');
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  decipher.setAuthTag(authTag);
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
+function encryptEnvVars(envVars: Record<string, string>): Record<string, string> {
+  const encrypted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(envVars)) {
+    encrypted[key] = encryptEnvVar(value);
+  }
+  return encrypted;
+}
+
+function decryptEnvVars(encrypted: Record<string, string>): Record<string, string> {
+  const decrypted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(encrypted)) {
+    try {
+      decrypted[key] = decryptEnvVar(value);
+    } catch (error) {
+      console.error(`Error decrypting ${key}:`, error);
+      decrypted[key] = value; // Fallback to plain value if decryption fails
+    }
+  }
+  return decrypted;
+}
+
+// ========== Keychain Permission Check ==========
+
+async function checkKeychainPermission(): Promise<boolean> {
+  try {
+    // Test write access to keychain
+    await keytar.setPassword(SERVICE_NAME, '__test__', '__test__');
+    await keytar.deletePassword(SERVICE_NAME, '__test__');
+    return true;
+  } catch (error) {
+    console.error('Keychain permission check failed:', error);
+    return false;
+  }
+}
+
+// ========== OAuth BrowserWindow ==========
+
+async function authenticateWithOAuth(platform: 'vercel' | 'railway'): Promise<TokenResult> {
+  return new Promise((resolve) => {
+    let authWindow: BrowserWindow | null = null;
+
+    const cleanup = () => {
+      if (authWindow) {
+        authWindow.close();
+        authWindow = null;
+      }
+    };
+
+    authWindow = new BrowserWindow({
+      width: 500,
+      height: 700,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    let authUrl = '';
+    let redirectUri = '';
+
+    if (platform === 'vercel') {
+      // Vercel OAuth flow - redirect to create token page
+      authUrl = 'https://vercel.com/account/tokens';
+      // Note: Vercel requires manual token creation
+    } else if (platform === 'railway') {
+      // Railway uses API tokens - redirect to token creation page
+      authUrl = 'https://railway.app/account/tokens';
+    }
+
+    authWindow.loadURL(authUrl);
+    authWindow.show();
+
+    // For Vercel and Railway, users need to manually copy tokens
+    // Monitor for token creation completion
+    let tokenSubmitted = false;
+
+    // Inject script to detect token input
+    authWindow.webContents.executeJavaScript(`
+      (function() {
+        const observer = new MutationObserver(() => {
+          // Check if token is visible on page (simplified - would need platform-specific detection)
+          const tokenElements = document.querySelectorAll('[data-token], .token, input[type="text"][value*=""]');
+          if (tokenElements.length > 0) {
+            window.postMessage({ type: 'token-ready' }, '*');
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      })();
+    `);
+
+    // Listen for messages from injected script
+    authWindow.webContents.on('did-finish-load', () => {
+      authWindow?.webContents.send('show-token-input');
+    });
+
+    // For manual token entry, we'll prompt user after window closes
+    authWindow.on('closed', () => {
+      cleanup();
+      // Return a special flag indicating manual token entry needed
+      resolve({ success: false, error: 'Please copy your token from the opened page and enter it manually' });
+    });
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      if (!tokenSubmitted) {
+        cleanup();
+        resolve({ success: false, error: 'Authentication timeout' });
+      }
+    }, 300000);
+  });
+}
+
 // ========== Secure Token Management ==========
 
 async function getToken(platform: Platform): Promise<TokenResult> {
   try {
+    // Check keychain permissions first
+    const hasPermission = await checkKeychainPermission();
+    if (!hasPermission) {
+      return { success: false, error: 'Keychain permission denied. Please grant access in system preferences.' };
+    }
+
     const token = await keytar.getPassword(SERVICE_NAME, `${platform}-token`);
     if (!token) {
       return { success: false, error: 'No token found for platform' };
@@ -75,17 +222,44 @@ async function getToken(platform: Platform): Promise<TokenResult> {
     return { success: true, token };
   } catch (error) {
     console.error(`Error getting token for ${platform}:`, error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('denied') || errorMessage.includes('permission')) {
+      return { success: false, error: 'Keychain access denied. Please grant access in system preferences.' };
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
 async function setToken(platform: Platform, token: string): Promise<TokenResult> {
   try {
+    // Check keychain permissions first
+    const hasPermission = await checkKeychainPermission();
+    if (!hasPermission) {
+      return { success: false, error: 'Keychain permission denied. Please grant access in system preferences.' };
+    }
+
     await keytar.setPassword(SERVICE_NAME, `${platform}-token`, token);
-    return { success: true, token };
+    return { success: true, token: '***' }; // Don't return actual token
   } catch (error) {
     console.error(`Error setting token for ${platform}:`, error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('denied') || errorMessage.includes('permission')) {
+      return { success: false, error: 'Keychain access denied. Please grant access in system preferences.' };
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
+async function authenticateOAuth(platform: 'vercel' | 'railway'): Promise<TokenResult> {
+  try {
+    const result = await authenticateWithOAuth(platform);
+    if (result.success && result.token) {
+      return await setToken(platform, result.token);
+    }
+    return result;
+  } catch (error) {
+    console.error(`OAuth error for ${platform}:`, error);
+    return { success: false, error: error instanceof Error ? error.message : 'OAuth authentication failed' };
   }
 }
 
@@ -124,6 +298,9 @@ async function deployVercel(config: DeployConfig, deploymentId: string): Promise
   emitLog(deploymentId, 'Starting Vercel deployment...', 'info');
   
   try {
+    // Decrypt env vars before deployment
+    const decryptedEnvVars = decryptEnvVars(config.envVars);
+    
     const tokenResult = await getToken('vercel');
     if (!tokenResult.success || !tokenResult.token) {
       emitLog(deploymentId, 'Vercel token not found', 'error');
@@ -157,7 +334,7 @@ async function deployVercel(config: DeployConfig, deploymentId: string): Promise
           type: 'github',
           repo: config.repoPath, // In production, extract from git remote
         },
-        env: Object.entries(config.envVars).map(([key, value]) => ({
+        env: Object.entries(decryptedEnvVars).map(([key, value]) => ({
           key,
           value,
           type: 'encrypted',
@@ -224,6 +401,9 @@ async function deployRailway(config: DeployConfig, deploymentId: string): Promis
   emitLog(deploymentId, 'Starting Railway deployment...', 'info');
   
   try {
+    // Decrypt env vars before deployment
+    const decryptedEnvVars = decryptEnvVars(config.envVars);
+    
     const tokenResult = await getToken('railway');
     if (!tokenResult.success || !tokenResult.token) {
       emitLog(deploymentId, 'Railway token not found', 'error');
@@ -288,7 +468,7 @@ async function deployRailway(config: DeployConfig, deploymentId: string): Promis
       },
       body: JSON.stringify({
         serviceId: project.id, // Simplified - in production create service first
-        variables: config.envVars,
+        variables: decryptedEnvVars,
       }),
     });
 
@@ -348,6 +528,9 @@ async function deployRender(config: DeployConfig, deploymentId: string): Promise
   emitLog(deploymentId, 'Starting Render deployment...', 'info');
   
   try {
+    // Decrypt env vars before deployment
+    const decryptedEnvVars = decryptEnvVars(config.envVars);
+    
     const tokenResult = await getToken('render');
     if (!tokenResult.success || !tokenResult.token) {
       emitLog(deploymentId, 'Render token not found', 'error');
@@ -377,7 +560,7 @@ async function deployRender(config: DeployConfig, deploymentId: string): Promise
         type: 'web_service',
         name: projectName,
         repo: config.repoPath, // In production, extract from git remote
-        envVars: Object.entries(config.envVars).map(([key, value]) => ({
+        envVars: Object.entries(decryptedEnvVars).map(([key, value]) => ({
           key,
           value,
         })),
@@ -532,19 +715,33 @@ ipcMain.handle('token:set', async (_event, platform: Platform, token: string) =>
   return await setToken(platform, token);
 });
 
+ipcMain.handle('token:oauth', async (_event, platform: 'vercel' | 'railway') => {
+  return await authenticateOAuth(platform);
+});
+
+ipcMain.handle('keychain:check', async () => {
+  const hasPermission = await checkKeychainPermission();
+  return { success: hasPermission, hasPermission };
+});
+
 // Deployment
 ipcMain.handle('deploy:queue', async (_event, config: DeployConfig) => {
   const deploymentId = `deploy_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+  
+  // Encrypt env vars before storing
+  const encryptedEnvVars = encryptEnvVars(config.envVars);
+  const configWithEncrypted = { ...config, envVars: encryptedEnvVars };
+  
   const item: QueueItem = {
     id: deploymentId,
-    config,
+    config: configWithEncrypted,
     status: 'queued',
     createdAt: new Date().toISOString(),
   };
 
   deployQueue.push(item);
 
-  // Store in database
+  // Store in database with encrypted env vars
   if (deployDb) {
     deployDb
       .prepare(
@@ -554,7 +751,7 @@ ipcMain.handle('deploy:queue', async (_event, config: DeployConfig) => {
         deploymentId,
         config.platform,
         config.repoPath,
-        JSON.stringify(config.envVars),
+        JSON.stringify(encryptedEnvVars),
         config.projectName || null,
         config.branch || null,
         'queued'

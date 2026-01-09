@@ -32,6 +32,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Token management IPC methods
     get: (platform: Platform) => ipcRenderer.invoke('token:get', platform),
     set: (platform: Platform, token: string) => ipcRenderer.invoke('token:set', platform, token),
+    oauth: (platform: 'vercel' | 'railway') => ipcRenderer.invoke('token:oauth', platform),
+  },
+  keychain: {
+    // Keychain permission check
+    check: () => ipcRenderer.invoke('keychain:check'),
   },
   repo: {
     // Repository-related IPC methods

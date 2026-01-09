@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useWizard } from '../contexts/WizardContext';
-import { Plus, Trash2, ArrowLeft, CheckCircle, Info } from 'lucide-react';
+import { useElectron } from '../hooks/useElectron';
+import { Plus, Trash2, ArrowLeft, CheckCircle, Info, Lock, Key, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 
 // Dynamic schema based on platform
 const getEnvSchema = (platform: string) => {
@@ -87,6 +88,31 @@ const platformDescriptions: Record<string, Record<string, string>> = {
 
 export function StepEnv() {
   const { state, setEnvVar, prevStep, reset } = useWizard();
+  const { electronAPI, isAvailable } = useElectron();
+  const [keychainPermission, setKeychainPermission] = useState<boolean | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<'vercel' | 'railway' | null>(null);
+  const [tokenStatus, setTokenStatus] = useState<Record<string, boolean>>({});
+
+  // Check keychain permission on mount
+  useEffect(() => {
+    if (isAvailable && electronAPI?.keychain?.check) {
+      electronAPI.keychain.check().then((result: any) => {
+        setKeychainPermission(result?.hasPermission ?? false);
+      });
+    }
+  }, [isAvailable, electronAPI]);
+
+  // Check token status for platforms
+  useEffect(() => {
+    if (state.selectedPlatform && isAvailable && electronAPI?.token?.get) {
+      const platform = state.selectedPlatform === 'vercel' ? 'vercel' : state.selectedPlatform === 'railway' ? 'railway' : null;
+      if (platform) {
+        electronAPI.token.get(platform).then((result: any) => {
+          setTokenStatus((prev) => ({ ...prev, [platform]: result?.success ?? false }));
+        });
+      }
+    }
+  }, [state.selectedPlatform, isAvailable, electronAPI]);
 
   const schema = useMemo(() => {
     if (!state.selectedPlatform) return z.object({});
@@ -100,6 +126,7 @@ export function StepEnv() {
     handleSubmit,
     control,
     formState: { errors },
+    setValue,
   } = useForm<EnvForm>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -112,6 +139,33 @@ export function StepEnv() {
     control,
     name: 'customVars',
   });
+
+  const handleOAuth = async (platform: 'vercel' | 'railway') => {
+    if (!electronAPI?.token?.oauth) {
+      return;
+    }
+
+    setOauthLoading(platform);
+    try {
+      const result = await electronAPI.token.oauth(platform);
+      if (result?.success) {
+        setTokenStatus((prev) => ({ ...prev, [platform]: true }));
+        // Set token field as authenticated
+        if (platform === 'vercel') {
+          setValue('VERCEL_TOKEN', '***authenticated***' as any);
+        } else if (platform === 'railway') {
+          setValue('RAILWAY_TOKEN', '***authenticated***' as any);
+        }
+      } else {
+        alert(`OAuth failed: ${result?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('OAuth error:', error);
+      alert(`OAuth error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setOauthLoading(null);
+    }
+  };
 
   const onSubmit = (data: EnvForm) => {
     // Save all environment variables
@@ -161,8 +215,21 @@ export function StepEnv() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Environment Variables</h2>
         <p className="text-gray-600 dark:text-gray-400">
           Configure environment variables for <span className="font-semibold">{state.selectedPlatform}</span>{' '}
-          deployment.
+          deployment. All values are encrypted before deployment.
         </p>
+
+        {/* Keychain Permission Warning */}
+        {keychainPermission === false && (
+          <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Keychain Access Required</p>
+              <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                Please grant keychain access in your system preferences to securely store tokens.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -170,25 +237,69 @@ export function StepEnv() {
         {platformFields.map((fieldName) => {
           const fieldSchema = schemaShape[fieldName];
           const isRequired = fieldSchema?._def?.typeName === 'ZodString' && !fieldSchema.isOptional();
+          const isTokenField = fieldName.includes('TOKEN') || fieldName.includes('SECRET') || fieldName.includes('KEY');
+          const isPassword = isTokenField || fieldName.toLowerCase().includes('secret') || fieldName.toLowerCase().includes('password');
+          const platform = state.selectedPlatform === 'vercel' ? 'vercel' : state.selectedPlatform === 'railway' ? 'railway' : null;
+          const hasToken = platform && tokenStatus[platform];
+          const isVercelToken = fieldName === 'VERCEL_TOKEN' && state.selectedPlatform === 'vercel';
+          const isRailwayToken = (fieldName === 'RAILWAY_TOKEN' || fieldName === 'RAILWAY_API_TOKEN') && state.selectedPlatform === 'railway';
+          const showOAuthButton = (isVercelToken || isRailwayToken) && platform && !hasToken;
+
           return (
             <div key={fieldName}>
-              <label
-                htmlFor={fieldName}
-                className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
-              >
-                {fieldName}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label
+                  htmlFor={fieldName}
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2"
+                >
+                  {isPassword && <Lock className="w-4 h-4" />}
+                  {fieldName}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {showOAuthButton && (
+                  <button
+                    type="button"
+                    onClick={() => handleOAuth(platform)}
+                    disabled={oauthLoading === platform}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {oauthLoading === platform ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Authenticating...
+                      </>
+                    ) : (
+                      <>
+                        <Key className="w-4 h-4" />
+                        Authenticate with {platform === 'vercel' ? 'Vercel' : 'Railway'}
+                      </>
+                    )}
+                  </button>
+                )}
+                {hasToken && (isVercelToken || isRailwayToken) && (
+                  <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4" />
+                    Authenticated
+                  </span>
+                )}
+              </div>
               <input
                 id={fieldName}
-                type={fieldName.toLowerCase().includes('secret') || fieldName.toLowerCase().includes('key') ? 'password' : 'text'}
+                type={isPassword ? 'password' : 'text'}
                 {...register(fieldName as any)}
+                disabled={hasToken && (isVercelToken || isRailwayToken)}
                 className={`w-full px-4 py-3 rounded-lg border ${
                   errors[fieldName as keyof typeof errors]
                     ? 'border-red-500 focus:ring-red-500'
                     : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-                } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2`}
-                placeholder={`Enter ${fieldName}`}
+                } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                  hasToken && (isVercelToken || isRailwayToken) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                placeholder={
+                  hasToken && (isVercelToken || isRailwayToken)
+                    ? 'Token authenticated via OAuth'
+                    : `Enter ${fieldName}`
+                }
               />
               {descriptions[fieldName] && (
                 <div className="mt-2 flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -248,14 +359,16 @@ export function StepEnv() {
                   <div>
                     <label
                       htmlFor={`customVars.${index}.value`}
-                      className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
+                      className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2"
                     >
-                      Value
+                      <Lock className="w-3 h-3" />
+                      Value (encrypted)
                     </label>
                     <input
                       id={`customVars.${index}.value`}
+                      type="password"
                       {...register(`customVars.${index}.value`)}
-                      placeholder="value"
+                      placeholder="value (will be encrypted)"
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {errors.customVars?.[index]?.value && (

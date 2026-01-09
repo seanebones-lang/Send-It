@@ -73,6 +73,10 @@ export interface ElectronAPI {
   token: {
     get: (platform: DeployPlatform) => Promise<TokenResult>;
     set: (platform: DeployPlatform, token: string) => Promise<TokenResult>;
+    oauth: (platform: 'vercel' | 'railway') => Promise<TokenResult>;
+  };
+  keychain: {
+    check: () => Promise<{ success: boolean; hasPermission?: boolean }>;
   };
   repo: {
     clone: (repoUrl: string, targetPath?: string) => Promise<CloneResult>;
