@@ -24,17 +24,29 @@ export function useDeploymentHistory() {
   return useInfiniteQuery<DeploymentHistoryResponse>({
     queryKey: ['deployments', 'history'],
     queryFn: async ({ pageParam = 0 }) => {
-      if (!electronAPI?.deployments?.list) {
+      if (!electronAPI?.deploy?.queueList) {
         // Fallback: return empty if API not available
         return { deployments: [], hasMore: false, total: 0 };
       }
 
-      const response = await electronAPI.deployments.list({
-        offset: pageParam as number,
-        limit: 50,
-      });
+      // Use the existing queueList API
+      const queueItems = await electronAPI.deploy.queueList();
+      
+      // Transform QueueItem[] to Deployment[]
+      const deployments: Deployment[] = queueItems.map((item) => ({
+        id: item.id,
+        platform: item.config.platform,
+        status: item.status === 'completed' ? 'success' : item.status === 'failed' ? 'failed' : 'pending',
+        url: item.result?.url,
+        createdAt: item.createdAt,
+        repoUrl: item.config.repoPath || '',
+      }));
 
-      return response as DeploymentHistoryResponse;
+      return {
+        deployments,
+        hasMore: false, // queueList returns all items, no pagination
+        total: deployments.length,
+      };
     },
     getNextPageParam: (lastPage, pages) => {
       return lastPage.hasMore ? pages.length * 50 : undefined;
