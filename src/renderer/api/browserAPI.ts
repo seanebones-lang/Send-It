@@ -2,6 +2,7 @@
 // This allows the web version to work without Electron
 
 import type { CloneResult, FrameworkAnalysisResult, AnalysisPlatform } from '../electron';
+import { fetchWithRetry } from '../utils/retryWithBackoff';
 
 /**
  * GitHub API rate limit tracking
@@ -76,11 +77,15 @@ async function fetchGitHubFile(owner: string, repo: string, path: string): Promi
   }
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
+    const response = await fetchWithRetry(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      {
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+        },
       },
-    });
+      { maxRetries: 2 }
+    );
 
     // Update rate limit info from response
     updateRateLimitFromHeaders(response.headers);
@@ -250,11 +255,15 @@ export async function cloneRepoBrowser(repoUrl: string): Promise<CloneResult> {
 
   // Verify repository exists
   try {
-    const response = await fetch(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
+    const response = await fetchWithRetry(
+      `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`,
+      {
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+        },
       },
-    });
+      { maxRetries: 2 }
+    );
 
     // Update rate limit info
     updateRateLimitFromHeaders(response.headers);

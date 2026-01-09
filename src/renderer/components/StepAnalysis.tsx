@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { useWizard } from '../contexts/WizardContext';
-import { CheckCircle, XCircle, TrendingUp, ArrowRight, Download, FileJson } from 'lucide-react';
+import { CheckCircle, XCircle, TrendingUp, ArrowRight, Download, FileJson, Share2, Link } from 'lucide-react';
 import type { Platform } from '../contexts/WizardContext';
 import { PlatformTable, type PlatformRow } from './PlatformTable';
 import { SkeletonLoader, PlatformCardSkeleton } from './SkeletonLoader';
 import { useToast } from './Toast';
 import { platformCosts } from '../data/platformCosts';
+import { copyShareURLToClipboard } from '../utils/urlSharing';
 
 const platformNames: Record<Platform, string> = {
   vercel: 'Vercel',
@@ -27,7 +28,7 @@ const platformColors: Record<Platform, string> = {
 
 export function StepAnalysis() {
   const { state, setSelectedPlatform, nextStep, prevStep } = useWizard();
-  const { success } = useToast();
+  const { success, error } = useToast();
 
   const handleExportJSON = () => {
     const exportData = {
@@ -51,6 +52,22 @@ export function StepAnalysis() {
     URL.revokeObjectURL(url);
 
     success('Analysis exported successfully!');
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      repoUrl: state.repoUrl,
+      framework: state.analysisResult?.framework,
+      scores: state.analysisResult?.scores,
+      selectedPlatform: state.selectedPlatform,
+    };
+
+    const copied = await copyShareURLToClipboard(shareData);
+    if (copied) {
+      success('Share link copied to clipboard!');
+    } else {
+      error('Failed to copy share link');
+    }
   };
 
   if (!state.analysisResult?.success || !state.analysisResult.scores) {
@@ -133,13 +150,24 @@ export function StepAnalysis() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Recommendations</h2>
-          <button
-            onClick={handleExportJSON}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-          >
-            <FileJson className="w-4 h-4" />
-            Export JSON
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleShare}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              title="Copy share link to clipboard"
+            >
+              <Share2 className="w-4 h-4" />
+              Share
+            </button>
+            <button
+              onClick={handleExportJSON}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              title="Export analysis as JSON"
+            >
+              <FileJson className="w-4 h-4" />
+              Export
+            </button>
+          </div>
         </div>
         <p className="text-gray-600 dark:text-gray-400">
           Based on your <span className="font-semibold">{state.analysisResult.framework}</span> framework, here are
