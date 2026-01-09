@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, webContents } from 'electron';
+import { app, BrowserWindow, ipcMain, webContents, Menu, nativeImage, dock, Notification } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
@@ -29,40 +29,180 @@ let isProcessingQueue = false;
 // Active deployments tracking
 const activeDeployments = new Map<string, DeployStatus>();
 
-app.whenReady().then(() => {
-  db = new OldDatabase();
-  
-  // Initialize better-sqlite3 for deployments
-  const dbPath = path.join(app.getPath('userData'), 'deployments.db');
-  deployDb = new Database(dbPath);
-  
-  // Create deployments table
-  deployDb.exec(`
-    CREATE TABLE IF NOT EXISTS deployments (
-      id TEXT PRIMARY KEY,
-      platform TEXT NOT NULL,
-      repo_path TEXT NOT NULL,
-      env_vars TEXT NOT NULL,
-      project_name TEXT,
-      branch TEXT,
-      status TEXT NOT NULL,
-      deployment_id TEXT,
-      url TEXT,
-      error TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      started_at DATETIME,
-      completed_at DATETIME
-    );
-    
-    CREATE TABLE IF NOT EXISTS deployment_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      deployment_id TEXT NOT NULL,
-      message TEXT NOT NULL,
-      level TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-});
+// Dock badge counter
+let activeDeployCount = 0;
+
+// Update dock badge
+function updateDockBadge() {
+  if (process.platform === 'darwin' && dock) {
+    if (activeDeployCount > 0) {
+      dock.setBadge(activeDeployCount.toString());
+    } else {
+      dock.setBadge('');
+    }
+  }
+}
+
+// Send notification
+function sendNotification(title: string, message: string, status: 'success' | 'error' | 'info' = 'info') {
+  if (!Notification.isSupported()) {
+    console.log(`Notification: ${title} - ${message}`);
+    return;
+  }
+
+  const notification = new Notification({
+    title,
+    body: message,
+    icon: process.platform === 'darwin'
+      ? path.join(__dirname, '../assets/icon.icns')
+      : path.join(__dirname, '../assets/icon.png'),
+    sound: status === 'error' ? false : true,
+    urgency: status === 'error' ? 'critical' : status === 'success' ? 'normal' : 'low',
+  });
+
+  notification.on('click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  notification.show();
+
+  // Bounce dock on macOS for errors
+  if (process.platform === 'darwin' && dock && status === 'error') {
+    dock.bounce('critical');
+  }
+}
+
+// Create macOS menu bar
+function createMenuBar() {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.getName(),
+      submenu: [
+        { role: 'about' as const, label: `About ${app.getName()}` },
+        { type: 'separator' },
+        { role: 'services' as const, submenu: [] },
+        { type: 'separator' },
+        { role: 'hide' as const, label: `Hide ${app.getName()}` },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' },
+        { role: 'quit' as const, label: `Quit ${app.getName()}` },
+      ],
+    },
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Deployment',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:new-deployment');
+            }
+          },
+        },
+        { type: 'separator' },
+        { role: 'close' as const },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const },
+        { type: 'separator' },
+        { role: 'togglefullscreen' as const },
+      ],
+    },
+    {
+      label: 'Deployments',
+      submenu: [
+        {
+          label: 'View Queue',
+          accelerator: 'CmdOrCtrl+D',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:view-queue');
+            }
+          },
+        },
+        {
+          label: 'Deployment History',
+          accelerator: 'CmdOrCtrl+H',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:view-history');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: `Active Deployments: ${activeDeployCount}`,
+          enabled: false,
+        },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
+        { type: 'separator' },
+        { role: 'front' as const },
+        { type: 'separator' },
+        { role: 'window' as const },
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Documentation',
+          click: () => {
+            const { shell } = require('electron');
+            shell.openExternal('https://github.com/seanebones-lang/Send-It');
+          },
+        },
+        {
+          label: 'Report Issue',
+          click: () => {
+            const { shell } = require('electron');
+            shell.openExternal('https://github.com/seanebones-lang/Send-It/issues');
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+// Database initialization will happen in app.whenReady() below
 
 // ========== Encryption Utilities ==========
 
@@ -642,6 +782,10 @@ async function processDeploymentQueue() {
     item.status = 'processing';
     item.startedAt = new Date().toISOString();
 
+    // Update dock badge
+    activeDeployCount = deployQueue.filter((d) => d.status === 'processing' || d.status === 'queued').length;
+    updateDockBadge();
+
     // Update database
     if (deployDb) {
       deployDb
@@ -650,6 +794,7 @@ async function processDeploymentQueue() {
     }
 
     emitLog(item.id, `Processing deployment: ${item.config.platform}`, 'info');
+    sendNotification('Deployment Started', `${item.config.platform} deployment in progress`, 'info');
 
     let result: DeployResult;
 
@@ -688,6 +833,25 @@ async function processDeploymentQueue() {
     }
 
     emitLog(item.id, `Deployment ${result.success ? 'completed' : 'failed'}`, result.success ? 'success' : 'error');
+
+    // Update dock badge
+    activeDeployCount = deployQueue.filter((d) => d.status === 'processing' || d.status === 'queued').length;
+    updateDockBadge();
+
+    // Send notification
+    if (result.success) {
+      sendNotification(
+        'Deployment Successful',
+        `${item.config.platform} deployment completed${result.url ? `: ${result.url}` : ''}`,
+        'success'
+      );
+    } else {
+      sendNotification(
+        'Deployment Failed',
+        `${item.config.platform} deployment failed: ${result.error || 'Unknown error'}`,
+        'error'
+      );
+    }
 
     // Broadcast status update
     webContents.getAllWebContents().forEach((contents) => {
@@ -740,6 +904,13 @@ ipcMain.handle('deploy:queue', async (_event, config: DeployConfig) => {
   };
 
   deployQueue.push(item);
+
+  // Update dock badge
+  activeDeployCount = deployQueue.filter((d) => d.status === 'processing' || d.status === 'queued').length;
+  updateDockBadge();
+
+  // Send notification
+  sendNotification('Deployment Queued', `New ${config.platform} deployment added to queue`, 'info');
 
   // Store in database with encrypted env vars
   if (deployDb) {
@@ -920,12 +1091,27 @@ const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
+    minWidth: 600,
+    minHeight: 400,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+    icon: process.platform === 'darwin' 
+      ? path.join(__dirname, '../assets/icon.icns')
+      : path.join(__dirname, '../assets/icon.png'),
   });
+
+  // Set up menu bar on macOS
+  if (process.platform === 'darwin') {
+    createMenuBar();
+    
+    // Update menu bar periodically with deployment count
+    setInterval(() => {
+      createMenuBar(); // Rebuild menu to update deployment count
+    }, 5000);
+  }
 
   // and load the index.html of the app.
   // Electron Forge webpack plugin automatically provides MAIN_WINDOW_WEBPACK_ENTRY
@@ -946,7 +1132,49 @@ const createWindow = (): void => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.whenReady().then(async () => {
+  // Initialize databases
+  db = new OldDatabase();
+  
+  // Initialize better-sqlite3 for deployments
+  const dbPath = path.join(app.getPath('userData'), 'deployments.db');
+  deployDb = new Database(dbPath);
+  
+  // Create deployments table
+  deployDb.exec(`
+    CREATE TABLE IF NOT EXISTS deployments (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      repo_path TEXT NOT NULL,
+      env_vars TEXT NOT NULL,
+      project_name TEXT,
+      branch TEXT,
+      status TEXT NOT NULL,
+      deployment_id TEXT,
+      url TEXT,
+      error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      started_at DATETIME,
+      completed_at DATETIME
+    );
+    
+    CREATE TABLE IF NOT EXISTS deployment_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deployment_id TEXT NOT NULL,
+      message TEXT NOT NULL,
+      level TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
+  // Create window
+  createWindow();
+  
+  // Initialize dock badge on macOS
+  if (process.platform === 'darwin') {
+    updateDockBadge();
+  }
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
