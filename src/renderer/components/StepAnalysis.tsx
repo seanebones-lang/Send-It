@@ -1,12 +1,14 @@
 import React, { useMemo } from 'react';
 import { useWizard } from '../contexts/WizardContext';
-import { CheckCircle, XCircle, TrendingUp, ArrowRight, Download, FileJson, Share2, Link } from 'lucide-react';
+import { CheckCircle, XCircle, TrendingUp, ArrowRight, Download, FileJson, Share2, Link, BarChart3 } from 'lucide-react';
 import type { Platform } from '../contexts/WizardContext';
 import { PlatformTable, type PlatformRow } from './PlatformTable';
 import { SkeletonLoader, PlatformCardSkeleton } from './SkeletonLoader';
 import { useToast } from './Toast';
 import { platformCosts } from '../data/platformCosts';
 import { copyShareURLToClipboard } from '../utils/urlSharing';
+import { PlatformChart } from './PlatformChart';
+import { CostCalculator } from './CostCalculator';
 
 const platformNames: Record<Platform, string> = {
   vercel: 'Vercel',
@@ -146,14 +148,25 @@ export function StepAnalysis() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Recommendations</h2>
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div className="glass-dark rounded-2xl p-8 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+              <BarChart3 className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold text-white">Platform Intelligence</h2>
+              <p className="text-gray-300">
+                Optimized for <span className="font-semibold text-blue-400">{state.analysisResult.framework}</span>
+              </p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleShare}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 glass hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-all-smooth flex items-center gap-2"
               title="Copy share link to clipboard"
             >
               <Share2 className="w-4 h-4" />
@@ -161,7 +174,7 @@ export function StepAnalysis() {
             </button>
             <button
               onClick={handleExportJSON}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition-all-smooth flex items-center gap-2 shadow-lg"
               title="Export analysis as JSON"
             >
               <FileJson className="w-4 h-4" />
@@ -169,17 +182,26 @@ export function StepAnalysis() {
             </button>
           </div>
         </div>
-        <p className="text-gray-600 dark:text-gray-400">
-          Based on your <span className="font-semibold">{state.analysisResult.framework}</span> framework, here are
-          the recommended deployment platforms:
-        </p>
       </div>
 
+      {/* Interactive Charts */}
+      <PlatformChart 
+        scores={scores}
+        selectedPlatform={state.selectedPlatform}
+        onPlatformClick={handlePlatformSelect}
+      />
+
+      {/* Cost Calculator */}
+      <CostCalculator 
+        platforms={sortedPlatforms.map(([platform]) => platform)}
+        scores={scores}
+      />
+
       {/* Platform Comparison Table */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-          Platform Recommendations
+      <div className="glass-dark rounded-2xl p-8 shadow-2xl">
+        <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <CheckCircle className="w-6 h-6 text-green-400" />
+          Detailed Comparison
         </h3>
         <PlatformTable
           data={platformRows}
@@ -189,17 +211,17 @@ export function StepAnalysis() {
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8">
+      <div className="flex justify-between glass-dark rounded-2xl p-6 shadow-2xl">
         <button
           onClick={prevStep}
-          className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors"
+          className="px-6 py-3 glass hover:bg-white/20 text-white font-semibold rounded-xl transition-all-smooth"
         >
-          Back
+          ← Back
         </button>
         <button
           onClick={nextStep}
           disabled={!state.selectedPlatform}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all-smooth flex items-center gap-2 shadow-lg"
           aria-disabled={!state.selectedPlatform}
         >
           Continue
