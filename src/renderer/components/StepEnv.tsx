@@ -89,7 +89,7 @@ const platformDescriptions: Record<string, Record<string, string>> = {
 
 export function StepEnv() {
   const { state, setEnvVar, prevStep, reset } = useWizard();
-  const { electronAPI, isAvailable } = useElectron();
+  const { electronAPI, isAvailable, isBrowser } = useElectron();
   const [keychainPermission, setKeychainPermission] = useState<boolean | null>(null);
   const [oauthLoading, setOauthLoading] = useState<'vercel' | 'railway' | null>(null);
   const [tokenStatus, setTokenStatus] = useState<Record<string, boolean>>({});
@@ -188,6 +188,72 @@ export function StepEnv() {
     alert('Environment variables saved! Wizard complete.');
     reset();
   };
+
+  // Browser mode - show informational message instead of form
+  if (isBrowser) {
+    return (
+      <div className="w-full max-w-3xl mx-auto p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Environment Variables</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Environment variable configuration for <span className="font-semibold">{state.selectedPlatform}</span>
+          </p>
+        </div>
+
+        <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Info className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                Browser Mode Limitation
+              </h3>
+              <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
+                Environment variable configuration and deployment features are only available in the desktop app. 
+                This is because secure token storage and deployment operations require system-level access.
+              </p>
+              <div className="space-y-2 mb-4">
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  What you can do in the desktop app:
+                </p>
+                <ul className="list-disc list-inside text-sm text-blue-600 dark:text-blue-400 space-y-1 ml-2">
+                  <li>Securely store API tokens in your system keychain</li>
+                  <li>Configure environment variables for deployments</li>
+                  <li>Deploy directly to {state.selectedPlatform}</li>
+                  <li>Manage multiple deployments</li>
+                  <li>View deployment logs in real-time</li>
+                </ul>
+              </div>
+              <a
+                href="https://github.com/seanebones-lang/Send-It/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Download Desktop App
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-6">
+          <button
+            onClick={prevStep}
+            className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+          <button
+            onClick={reset}
+            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Start Over
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!state.selectedPlatform) {
     return (

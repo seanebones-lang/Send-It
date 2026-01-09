@@ -5,6 +5,7 @@ import { StepAnalysis } from './components/StepAnalysis';
 import { StepEnv } from './components/StepEnv';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BrowserWarning } from './components/BrowserWarning';
+import { RateLimitIndicator } from './components/RateLimitIndicator';
 import { Circle, CheckCircle2 } from 'lucide-react';
 
 const steps = [
@@ -29,6 +30,7 @@ function WizardContent() {
   return (
     <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
       <BrowserWarning />
+      <RateLimitIndicator />
       <header className="p-6 shadow-md dark:shadow-gray-800 bg-gray-50 dark:bg-gray-800" role="banner">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Send-It</h1>

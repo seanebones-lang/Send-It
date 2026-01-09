@@ -4,6 +4,57 @@
 import type { CloneResult, FrameworkAnalysisResult, AnalysisPlatform } from '../electron';
 
 /**
+ * GitHub API rate limit tracking
+ */
+interface RateLimitInfo {
+  limit: number;
+  remaining: number;
+  reset: number; // Unix timestamp
+}
+
+let rateLimitInfo: RateLimitInfo | null = null;
+
+/**
+ * Check GitHub API rate limit from response headers
+ */
+function updateRateLimitFromHeaders(headers: Headers): void {
+  const limit = headers.get('x-ratelimit-limit');
+  const remaining = headers.get('x-ratelimit-remaining');
+  const reset = headers.get('x-ratelimit-reset');
+  
+  if (limit && remaining && reset) {
+    rateLimitInfo = {
+      limit: parseInt(limit, 10),
+      remaining: parseInt(remaining, 10),
+      reset: parseInt(reset, 10),
+    };
+  }
+}
+
+/**
+ * Get current rate limit status
+ */
+export function getRateLimitInfo(): RateLimitInfo | null {
+  return rateLimitInfo;
+}
+
+/**
+ * Check if rate limit is exceeded
+ */
+function isRateLimitExceeded(): boolean {
+  if (!rateLimitInfo) return false;
+  return rateLimitInfo.remaining === 0 && Date.now() / 1000 < rateLimitInfo.reset;
+}
+
+/**
+ * Get time until rate limit reset
+ */
+export function getTimeUntilReset(): number {
+  if (!rateLimitInfo) return 0;
+  return Math.max(0, rateLimitInfo.reset - Date.now() / 1000);
+}
+
+/**
  * Extract owner and repo from GitHub URL
  */
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
@@ -16,6 +67,14 @@ function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
  * Fetch file content from GitHub API
  */
 async function fetchGitHubFile(owner: string, repo: string, path: string): Promise<string | null> {
+  // Check rate limit before making request
+  if (isRateLimitExceeded()) {
+    const timeUntil = getTimeUntilReset();
+    const minutes = Math.ceil(timeUntil / 60);
+    console.warn(`GitHub API rate limit exceeded. Resets in ${minutes} minutes.`);
+    throw new Error(`GitHub API rate limit exceeded. Please try again in ${minutes} minutes.`);
+  }
+
   try {
     const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       headers: {
@@ -23,17 +82,31 @@ async function fetchGitHubFile(owner: string, repo: string, path: string): Promi
       },
     });
 
+    // Update rate limit info from response
+    updateRateLimitFromHeaders(response.headers);
+
     if (!response.ok) {
+      if (response.status === 403) {
+        const resetTime = response.headers.get('x-ratelimit-reset');
+        if (resetTime) {
+          const timeUntil = parseInt(resetTime, 10) - Date.now() / 1000;
+          const minutes = Math.ceil(timeUntil / 60);
+          throw new Error(`GitHub API rate limit exceeded. Resets in ${minutes} minutes.`);
+        }
+      }
       return null;
     }
 
     const data = await response.json();
     if (data.type === 'file' && data.encoding === 'base64') {
-      return atob(data.content);
+      return atob(data.content.replace(/\n/g, ''));
     }
     return null;
   } catch (error) {
     console.error(`Error fetching ${path}:`, error);
+    if (error instanceof Error && error.message.includes('rate limit')) {
+      throw error;
+    }
     return null;
   }
 }
@@ -165,6 +238,16 @@ export async function cloneRepoBrowser(repoUrl: string): Promise<CloneResult> {
     };
   }
 
+  // Check rate limit before making request
+  if (isRateLimitExceeded()) {
+    const timeUntil = getTimeUntilReset();
+    const minutes = Math.ceil(timeUntil / 60);
+    return {
+      success: false,
+      error: `GitHub API rate limit exceeded. Please try again in ${minutes} minutes, or download the desktop app for unlimited access.`,
+    };
+  }
+
   // Verify repository exists
   try {
     const response = await fetch(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`, {
@@ -173,6 +256,9 @@ export async function cloneRepoBrowser(repoUrl: string): Promise<CloneResult> {
       },
     });
 
+    // Update rate limit info
+    updateRateLimitFromHeaders(response.headers);
+
     if (!response.ok) {
       if (response.status === 404) {
         return {
@@ -180,11 +266,24 @@ export async function cloneRepoBrowser(repoUrl: string): Promise<CloneResult> {
           error: 'Repository not found. Please check the URL and ensure the repository is public.',
         };
       }
+      if (response.status === 403) {
+        const resetTime = response.headers.get('x-ratelimit-reset');
+        if (resetTime) {
+          const timeUntil = parseInt(resetTime, 10) - Date.now() / 1000;
+          const minutes = Math.ceil(timeUntil / 60);
+          return {
+            success: false,
+            error: `GitHub API rate limit exceeded. Resets in ${minutes} minutes. Download the desktop app for unlimited access.`,
+          };
+        }
+      }
       return {
         success: false,
         error: `GitHub API error: ${response.statusText}`,
       };
     }
+
+    const repoData = await response.json();
 
     // Return success with a virtual path (we don't actually clone in browser)
     return {

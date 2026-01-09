@@ -7,9 +7,20 @@ export function useElectron() {
   const cloneRepo = useCallback(
     async (repoUrl: string, targetPath?: string): Promise<CloneResult> => {
       if (!electronAPI?.repo?.clone) {
-        throw new Error('electronAPI.repo.clone not available');
+        // Return error result instead of throwing - graceful degradation
+        return {
+          success: false,
+          error: 'Repository cloning is not available. The browser API should provide this functionality.',
+        };
       }
-      return electronAPI.repo.clone(repoUrl, targetPath);
+      try {
+        return await electronAPI.repo.clone(repoUrl, targetPath);
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to clone repository',
+        };
+      }
     },
     [electronAPI]
   );
@@ -17,19 +28,32 @@ export function useElectron() {
   const analyzeFramework = useCallback(
     async (repoPath: string, repoUrl?: string): Promise<FrameworkAnalysisResult> => {
       if (!electronAPI?.repo?.analyzeFramework) {
-        throw new Error('electronAPI.repo.analyzeFramework not available');
+        // Return error result instead of throwing - graceful degradation
+        return {
+          success: false,
+          error: 'Framework analysis is not available. The browser API should provide this functionality.',
+        };
       }
-      return electronAPI.repo.analyzeFramework(repoPath, repoUrl);
+      try {
+        return await electronAPI.repo.analyzeFramework(repoPath, repoUrl);
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to analyze framework',
+        };
+      }
     },
     [electronAPI]
   );
 
   const isAvailable = electronAPI !== undefined;
+  const isBrowser = typeof window !== 'undefined' && !(window as any).process?.type;
 
   return {
     cloneRepo,
     analyzeFramework,
     isAvailable,
+    isBrowser,
     electronAPI,
   };
 }
