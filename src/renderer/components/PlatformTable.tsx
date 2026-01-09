@@ -10,7 +10,8 @@ import {
 } from '@tanstack/react-table';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { Platform } from '../contexts/WizardContext';
-import { CheckCircle, TrendingUp, XCircle, Search } from 'lucide-react';
+import { CheckCircle, TrendingUp, XCircle, Search, DollarSign } from 'lucide-react';
+import { platformCosts, getCostRatingLabel, getCostRatingColor } from '../data/platformCosts';
 
 const platformNames: Record<Platform, string> = {
   vercel: 'Vercel',
@@ -35,6 +36,7 @@ export interface PlatformRow {
   score: number;
   features: string[];
   recommended: boolean;
+  costRating?: number;
 }
 
 interface PlatformTableProps {

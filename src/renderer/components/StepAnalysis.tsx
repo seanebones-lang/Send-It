@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
 import { useWizard } from '../contexts/WizardContext';
-import { CheckCircle, XCircle, TrendingUp, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, TrendingUp, ArrowRight, Download, FileJson } from 'lucide-react';
 import type { Platform } from '../contexts/WizardContext';
 import { PlatformTable, type PlatformRow } from './PlatformTable';
 import { SkeletonLoader, PlatformCardSkeleton } from './SkeletonLoader';
+import { useToast } from './Toast';
+import { platformCosts } from '../data/platformCosts';
 
 const platformNames: Record<Platform, string> = {
   vercel: 'Vercel',
@@ -25,6 +27,31 @@ const platformColors: Record<Platform, string> = {
 
 export function StepAnalysis() {
   const { state, setSelectedPlatform, nextStep, prevStep } = useWizard();
+  const { success } = useToast();
+
+  const handleExportJSON = () => {
+    const exportData = {
+      repoUrl: state.repoUrl,
+      repoPath: state.repoPath,
+      framework: state.analysisResult?.framework,
+      scores: state.analysisResult?.scores,
+      selectedPlatform: state.selectedPlatform,
+      timestamp: new Date().toISOString(),
+      exportedBy: 'Send-It v1.0.0',
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `send-it-analysis-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    success('Analysis exported successfully!');
+  };
 
   if (!state.analysisResult?.success || !state.analysisResult.scores) {
     return (
@@ -58,6 +85,7 @@ export function StepAnalysis() {
       score,
       features: getPlatformFeatures(platform, score),
       recommended: score >= 90,
+      costRating: platformCosts[platform]?.costRating || 3,
     }));
   }, [sortedPlatforms]);
 
@@ -103,7 +131,16 @@ export function StepAnalysis() {
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Platform Recommendations</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Recommendations</h2>
+          <button
+            onClick={handleExportJSON}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <FileJson className="w-4 h-4" />
+            Export JSON
+          </button>
+        </div>
         <p className="text-gray-600 dark:text-gray-400">
           Based on your <span className="font-semibold">{state.analysisResult.framework}</span> framework, here are
           the recommended deployment platforms:

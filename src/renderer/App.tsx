@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { WizardProvider, useWizard } from './contexts/WizardContext';
-import { StepRepo } from './components/StepRepo';
-import { StepAnalysis } from './components/StepAnalysis';
-import { StepEnv } from './components/StepEnv';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BrowserWarning } from './components/BrowserWarning';
 import { RateLimitIndicator } from './components/RateLimitIndicator';
+import { SkeletonLoader } from './components/SkeletonLoader';
 import { Circle, CheckCircle2 } from 'lucide-react';
+
+// Lazy load step components for better performance
+const StepRepo = lazy(() => import('./components/StepRepo').then(m => ({ default: m.StepRepo })));
+const StepAnalysis = lazy(() => import('./components/StepAnalysis').then(m => ({ default: m.StepAnalysis })));
+const StepEnv = lazy(() => import('./components/StepEnv').then(m => ({ default: m.StepEnv })));
 
 const steps = [
   { id: 0, name: 'Repository', component: StepRepo },
@@ -96,14 +99,24 @@ function WizardContent() {
           </ol>
         </nav>
 
-        {/* Current Step */}
+        {/* Current Step with Suspense for lazy loading */}
         <div className="max-w-4xl mx-auto">
-          <CurrentStep />
+          <Suspense fallback={
+            <div className="space-y-4 p-6">
+              <SkeletonLoader className="h-12 w-3/4" />
+              <SkeletonLoader className="h-32 w-full" />
+              <SkeletonLoader className="h-12 w-1/2" />
+            </div>
+          }>
+            <CurrentStep />
+          </Suspense>
         </div>
       </main>
     </div>
   );
 }
+
+import { ToastProvider } from './components/Toast';
 
 const App: React.FC = () => {
   return (
@@ -113,9 +126,11 @@ const App: React.FC = () => {
         console.error('Application error:', error, errorInfo);
       }}
     >
-      <WizardProvider>
-        <WizardContent />
-      </WizardProvider>
+      <ToastProvider>
+        <WizardProvider>
+          <WizardContent />
+        </WizardProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 };
