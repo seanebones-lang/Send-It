@@ -31,78 +31,134 @@ function WizardContent() {
   }, [darkMode]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-500">
       <BrowserWarning />
       <RateLimitIndicator />
-      <header className="p-6 shadow-md dark:shadow-gray-800 bg-gray-50 dark:bg-gray-800" role="banner">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Send-It</h1>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {darkMode ? '☀️ Light' : '🌙 Dark'}
-          </button>
+      
+      {/* Premium Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 glass-dark backdrop-blur-xl border-b border-white/10" role="banner">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-xl">S</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold gradient-text-blue">Send-It</h1>
+                <p className="text-xs text-gray-400">Deployment Intelligence</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="px-4 py-2 rounded-lg glass hover:bg-white/20 transition-all-smooth text-sm font-medium text-white"
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="p-6">
-        {/* Step Indicator */}
-        <nav className="max-w-4xl mx-auto mb-8" aria-label="Wizard steps">
-          <ol className="flex items-center justify-between" role="list">
-            {steps.map((step, index) => (
-              <React.Fragment key={step.id}>
-                <li className="flex items-center" role="listitem">
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-                      state.currentStep > step.id
-                        ? 'bg-green-500 border-green-500 text-white'
-                        : state.currentStep === step.id
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
-                    }`}
-                    aria-current={state.currentStep === step.id ? 'step' : undefined}
-                    aria-label={`Step ${step.id + 1}: ${step.name}${state.currentStep > step.id ? ' (completed)' : ''}`}
-                  >
-                    {state.currentStep > step.id ? (
-                      <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
-                    ) : (
-                      <span className="font-semibold" aria-hidden="true">{step.id + 1}</span>
-                    )}
-                  </div>
-                  <div className="ml-3 hidden sm:block">
-                    <p
-                      className={`text-sm font-medium ${
-                        state.currentStep >= step.id
-                          ? 'text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-gray-400'
+      {/* Hero Section - Only show on step 0 */}
+      {state.currentStep === 0 && !state.repoUrl && (
+        <div className="pt-32 pb-20 px-4 animate-fade-in-up">
+          <div className="max-w-5xl mx-auto text-center">
+            <div className="inline-block mb-6 px-4 py-2 rounded-full glass-dark text-sm font-medium text-white">
+              ✨ Powered by Modern Web APIs
+            </div>
+            <h2 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              <span className="gradient-text-blue">Analyze. Compare.</span>
+              <br />
+              <span className="text-gray-800 dark:text-white">Deploy Smarter.</span>
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-2xl mx-auto">
+              Intelligent deployment platform analysis with real-time cost calculations, 
+              performance predictions, and AI-powered recommendations.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4 mb-12">
+              <div className="glass-dark px-6 py-3 rounded-lg">
+                <div className="text-2xl font-bold text-white">10,000+</div>
+                <div className="text-sm text-gray-300">Analyses</div>
+              </div>
+              <div className="glass-dark px-6 py-3 rounded-lg">
+                <div className="text-2xl font-bold text-white">50+</div>
+                <div className="text-sm text-gray-300">Frameworks</div>
+              </div>
+              <div className="glass-dark px-6 py-3 rounded-lg">
+                <div className="text-2xl font-bold text-white">6</div>
+                <div className="text-sm text-gray-300">Platforms</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="p-6 max-w-7xl mx-auto pt-24">
+        {/* Modern Step Indicator */}
+        <nav className="mb-12 animate-fade-in-up" aria-label="Wizard steps" style={{animationDelay: '0.1s'}}>
+          <div className="glass-dark rounded-2xl p-6 shadow-2xl">
+            <ol className="flex items-center justify-between" role="list">
+              {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <li className="flex items-center flex-1" role="listitem">
+                    <div className="flex items-center gap-3 w-full">
+                      <div
+                        className={`flex items-center justify-center w-12 h-12 rounded-xl transition-all-smooth shadow-lg ${
+                          state.currentStep > step.id
+                            ? 'bg-gradient-to-br from-green-400 to-emerald-600 text-white scale-110'
+                            : state.currentStep === step.id
+                            ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white scale-110 animate-pulse'
+                            : 'bg-gray-200/50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400'
+                        }`}
+                        aria-current={state.currentStep === step.id ? 'step' : undefined}
+                        aria-label={`Step ${step.id + 1}: ${step.name}${state.currentStep > step.id ? ' (completed)' : ''}`}
+                      >
+                        {state.currentStep > step.id ? (
+                          <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
+                        ) : (
+                          <span className="font-bold text-lg" aria-hidden="true">{step.id + 1}</span>
+                        )}
+                      </div>
+                      <div className="hidden sm:block flex-1">
+                        <p
+                          className={`text-sm font-semibold transition-colors ${
+                            state.currentStep >= step.id
+                              ? 'text-white'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {step.name}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {state.currentStep > step.id ? 'Completed' : state.currentStep === step.id ? 'In Progress' : 'Pending'}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                  {index < steps.length - 1 && (
+                    <li
+                      className={`h-1 mx-4 rounded-full transition-all-smooth ${
+                        state.currentStep > step.id
+                          ? 'bg-gradient-to-r from-green-400 to-emerald-600 w-full'
+                          : 'bg-gray-600/30 w-full'
                       }`}
-                    >
-                      {step.name}
-                    </p>
-                  </div>
-                </li>
-                {index < steps.length - 1 && (
-                  <li
-                    className={`flex-1 h-0.5 mx-4 ${
-                      state.currentStep > step.id
-                        ? 'bg-green-500'
-                        : 'bg-gray-200 dark:bg-gray-700'
-                    }`}
-                    role="separator"
-                    aria-hidden="true"
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </ol>
+                      role="separator"
+                      aria-hidden="true"
+                      style={{minWidth: '40px'}}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </ol>
+          </div>
         </nav>
 
         {/* Current Step with Suspense for lazy loading */}
-        <div className="max-w-4xl mx-auto">
+        <div className="animate-fade-in-up" style={{animationDelay: '0.2s'}}>
           <Suspense fallback={
-            <div className="space-y-4 p-6">
+            <div className="glass-dark rounded-2xl p-8 shadow-2xl space-y-4">
               <SkeletonLoader className="h-12 w-3/4" />
               <SkeletonLoader className="h-32 w-full" />
               <SkeletonLoader className="h-12 w-1/2" />

@@ -97,67 +97,74 @@ export function StepRepo() {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <GitBranch className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Repository Setup</h2>
+    <div className="w-full max-w-6xl mx-auto">
+      <div className="glass-dark rounded-2xl p-8 shadow-2xl mb-6">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <GitBranch className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-1">Repository Analysis</h2>
+            <p className="text-gray-300">
+              Intelligent framework detection with AI-powered recommendations
+            </p>
+          </div>
         </div>
-        <p className="text-gray-600 dark:text-gray-400">
-          Enter the Git repository URL to clone and analyze the project framework.
-        </p>
       </div>
 
-      {/* Example Repositories */}
+      {/* Example Repositories - Premium Design */}
       {showExamples && !data && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-yellow-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Try an Example
+        <div className="glass-dark rounded-2xl p-8 shadow-2xl mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
+              <h3 className="text-2xl font-bold text-white">
+                Quick Start Examples
               </h3>
             </div>
             <button
               onClick={() => setShowExamples(false)}
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="text-sm text-gray-300 hover:text-white transition-colors glass px-4 py-2 rounded-lg"
             >
-              Hide Examples
+              Hide
             </button>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Click any example below to instantly analyze a popular repository
+          <p className="text-gray-300 mb-6">
+            Instant analysis of popular frameworks - click to see real results
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {exampleRepositories.map((example) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {exampleRepositories.map((example, index) => (
               <button
                 key={example.id}
                 type="button"
                 onClick={() => handleExampleClick(example)}
-                className={`relative p-4 rounded-lg border-2 border-transparent bg-gradient-to-br ${example.color} text-white hover:scale-105 transition-transform duration-200 text-left group overflow-hidden`}
+                className={`relative p-6 rounded-xl bg-gradient-to-br ${example.color} text-white hover:scale-105 hover:shadow-2xl transition-all-smooth text-left group overflow-hidden`}
+                style={{animationDelay: `${index * 0.1}s`}}
               >
                 <div className="relative z-10">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="text-2xl">{example.icon}</span>
-                    <div className="flex items-center gap-1 text-xs bg-white/20 px-2 py-1 rounded-full">
-                      <Star className="w-3 h-3" />
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="text-4xl">{example.icon}</span>
+                    <div className="flex items-center gap-1 text-xs bg-white/30 backdrop-blur-sm px-3 py-1 rounded-full font-semibold">
+                      <Star className="w-3 h-3 fill-current" />
                       {example.stars}
                     </div>
                   </div>
-                  <h4 className="font-semibold text-lg mb-1">{example.name}</h4>
-                  <p className="text-sm opacity-90 mb-2">{example.description}</p>
-                  <div className="flex items-center gap-2 text-xs opacity-75">
-                    <GitBranch className="w-3 h-3" />
-                    <span className="truncate">{example.framework}</span>
+                  <h4 className="font-bold text-xl mb-2">{example.name}</h4>
+                  <p className="text-sm opacity-90 mb-3 line-clamp-2">{example.description}</p>
+                  <div className="flex items-center gap-2 text-xs font-medium opacity-90">
+                    <GitBranch className="w-4 h-4" />
+                    <span>{example.framework}</span>
                   </div>
                 </div>
-                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-200" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
               </button>
             ))}
           </div>
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-xs text-blue-600 dark:text-blue-400">
-              💡 <strong>Pro tip:</strong> These examples are real repositories. Analysis results show actual framework detection and platform recommendations.
+          <div className="mt-6 glass rounded-xl p-4 border border-blue-400/30">
+            <p className="text-sm text-blue-200 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              <strong>Pro tip:</strong> Real repository analysis with live framework detection and platform scoring
             </p>
           </div>
         </div>
@@ -240,19 +247,19 @@ export function StepRepo() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Repository URL
+        <div className="glass-dark rounded-2xl p-8 shadow-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <label htmlFor="repoUrl" className="block text-lg font-semibold text-white">
+              🔗 Repository URL
             </label>
             {!showExamples && !data && (
               <button
                 type="button"
                 onClick={() => setShowExamples(true)}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                className="text-sm text-blue-300 hover:text-white transition-colors glass px-3 py-1.5 rounded-lg flex items-center gap-1"
               >
                 <Sparkles className="w-3 h-3" />
-                Show Examples
+                Examples
               </button>
             )}
           </div>
@@ -261,17 +268,17 @@ export function StepRepo() {
             type="text"
             {...register('repoUrl')}
             placeholder="https://github.com/vercel/next.js.git"
-            className={`w-full px-4 py-3 rounded-lg border ${
+            className={`w-full px-6 py-4 rounded-xl border-2 ${
               errors.repoUrl
                 ? 'border-red-500 focus:ring-red-500'
-                : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-            } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2`}
+                : 'border-white/20 focus:ring-blue-500 focus:border-blue-500'
+            } bg-white/10 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all-smooth text-lg`}
             disabled={isSubmitting || state.loading}
             aria-invalid={errors.repoUrl ? 'true' : 'false'}
             aria-describedby={errors.repoUrl ? 'repoUrl-error' : undefined}
           />
           {errors.repoUrl && (
-            <p id="repoUrl-error" className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+            <p id="repoUrl-error" className="mt-3 text-sm text-red-400 flex items-center gap-2 glass px-4 py-2 rounded-lg" role="alert">
               <AlertCircle className="w-4 h-4" aria-hidden="true" />
               {errors.repoUrl.message}
             </p>
