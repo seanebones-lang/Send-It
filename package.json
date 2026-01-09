@@ -32,6 +32,7 @@
     "@electron-forge/maker-zip": "^7.2.0",
     "@electron-forge/plugin-webpack": "^7.2.0",
     "@electron/notarize": "^2.2.2",
+    "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.2",
@@ -41,6 +42,7 @@
     "@types/react-dom": "^18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
+    "autoprefixer": "^10.4.23",
     "css-loader": "^6.8.1",
     "electron": "^28.0.0",
     "eslint": "^8.54.0",
@@ -57,7 +59,9 @@
     "ts-jest": "^29.1.5",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^5.1.4"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

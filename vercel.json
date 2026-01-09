@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run vercel-build",
-  "outputDirectory": ".vercel-output",
+  "outputDirectory": "dist",
   "devCommand": "npm start",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": null,

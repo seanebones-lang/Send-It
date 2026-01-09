@@ -5,7 +5,7 @@ module.exports = {
   mode: 'production',
   entry: './src/renderer/index.tsx',
   output: {
-    path: path.resolve(__dirname, '.vercel-output/static'),
+    path: path.resolve(__dirname, 'dist'),
     filename: 'js/[name].[contenthash].js',
     chunkFilename: 'js/[name].[contenthash].chunk.js',
     publicPath: '/',
@@ -21,8 +21,23 @@ module.exports = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
-        exclude: /node_modules/,
+        use: {
+          loader: 'ts-loader',
+          options: {
+            transpileOnly: true,
+            compilerOptions: {
+              noEmit: false,
+            },
+            onlyCompileBundledFiles: true,
+          },
+        },
+        include: [
+          path.resolve(__dirname, 'src/renderer'),
+        ],
+        exclude: [
+          /node_modules/,
+          /\.test\./,
+        ],
       },
       {
         test: /\.css$/,
@@ -32,9 +47,7 @@ module.exports = {
           {
             loader: 'postcss-loader',
             options: {
-              postcssOptions: {
-                plugins: [require('tailwindcss')],
-              },
+              postcssOptions: require('./postcss.config.js'),
             },
           },
         ],
