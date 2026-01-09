@@ -1,12 +1,8 @@
 import { useCallback } from 'react';
 import type { ElectronAPI, CloneResult, FrameworkAnalysisResult } from '../electron';
-import { electronAPI as browserElectronAPI } from '../electron.browser';
 
 export function useElectron() {
-  // Use browser-compatible API if Electron API is not available
-  const electronAPI = (typeof window !== 'undefined' && (window as any).electronAPI) 
-    ? ((window as any).electronAPI as ElectronAPI)
-    : browserElectronAPI;
+  const electronAPI = (window as any).electronAPI as ElectronAPI | undefined;
 
   const cloneRepo = useCallback(
     async (repoUrl: string, targetPath?: string): Promise<CloneResult> => {
