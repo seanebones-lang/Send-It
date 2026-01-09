@@ -9,11 +9,11 @@ export interface FrameworkAnalysis {
   repoUrl: string;
   repoPath: string;
   framework: string;
-  scores: string; // JSON string of Record<Platform, number>
+  scores: string; // JSON string of Record<AnalysisPlatform, number>
   analyzedAt: string;
 }
 
-type Platform = 'vercel' | 'netlify' | 'cloudflare' | 'aws' | 'azure' | 'gcp';
+import type { AnalysisPlatform } from './types/ipc';
 
 export class Database {
   private db: sqlite3.Database | null = null;
@@ -97,4 +97,4 @@ export class Database {
   }
 }
 
-export type { Platform };
+// Platform type exported from types/ipc.d.ts

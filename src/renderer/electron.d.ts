@@ -1,10 +1,9 @@
-type Platform = 'vercel' | 'netlify' | 'cloudflare' | 'aws' | 'azure' | 'gcp';
-type DeployPlatform = 'vercel' | 'railway' | 'render';
+import type { AnalysisPlatform, DeployPlatform } from '../types/ipc';
 
 export interface FrameworkAnalysisResult {
   success: boolean;
   framework?: string;
-  scores?: Record<Platform, number>;
+  scores?: Record<AnalysisPlatform, number>;
   error?: string;
 }
 

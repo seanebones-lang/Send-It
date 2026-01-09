@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Platform } from './database';
+import type { AnalysisPlatform } from './types/ipc';
+import { getFrameworkCache } from './utils/frameworkCache';
 
 export interface FrameworkDetection {
   framework: string;
-  scores: Record<Platform, number>;
+  scores: Record<AnalysisPlatform, number>;
 }
 
 export class FrameworkDetector {
@@ -99,11 +100,20 @@ export class FrameworkDetector {
     },
   };
 
-  static detect(repoPath: string): FrameworkDetection {
+  static detect(repoPath: string, useCache: boolean = true): FrameworkDetection {
+    // Check cache first
+    if (useCache) {
+      const cache = getFrameworkCache();
+      const cached = cache.get(repoPath);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const packageJsonPath = path.join(repoPath, 'package.json');
     
     if (!fs.existsSync(packageJsonPath)) {
-      return {
+      const result = {
         framework: 'unknown',
         scores: {
           vercel: 50,
@@ -112,8 +122,16 @@ export class FrameworkDetector {
           aws: 50,
           azure: 50,
           gcp: 50,
-        },
+        } as Record<AnalysisPlatform, number>,
       };
+
+      // Cache result even for unknown
+      if (useCache) {
+        const cache = getFrameworkCache();
+        cache.set(repoPath, result);
+      }
+
+      return result;
     }
 
     try {
@@ -132,16 +150,24 @@ export class FrameworkDetector {
         ).length;
 
         if (matchCount > 0) {
-          return {
+          const result = {
             framework,
-            scores: { ...config.platforms },
+            scores: { ...config.platforms } as Record<AnalysisPlatform, number>,
           };
+
+          // Cache result
+          if (useCache) {
+            const cache = getFrameworkCache();
+            cache.set(repoPath, result);
+          }
+
+          return result;
         }
       }
 
       // Check for static site indicators
       if (dependencyKeys.some((dep) => dep.includes('gatsby'))) {
-        return {
+        const result = {
           framework: 'gatsby',
           scores: {
             vercel: 95,
@@ -150,12 +176,20 @@ export class FrameworkDetector {
             aws: 70,
             azure: 65,
             gcp: 70,
-          },
+          } as Record<AnalysisPlatform, number>,
         };
+
+        // Cache result
+        if (useCache) {
+          const cache = getFrameworkCache();
+          cache.set(repoPath, result);
+        }
+
+        return result;
       }
 
       // Default: generic Node.js/React app
-      return {
+      const result = {
         framework: 'generic',
         scores: {
           vercel: 70,
@@ -164,11 +198,19 @@ export class FrameworkDetector {
           aws: 80,
           azure: 70,
           gcp: 75,
-        },
+        } as Record<AnalysisPlatform, number>,
       };
+
+      // Cache result
+      if (useCache) {
+        const cache = getFrameworkCache();
+        cache.set(repoPath, result);
+      }
+
+      return result;
     } catch (error) {
       console.error('Error reading package.json:', error);
-      return {
+      const result = {
         framework: 'unknown',
         scores: {
           vercel: 50,
@@ -177,8 +219,35 @@ export class FrameworkDetector {
           aws: 50,
           azure: 50,
           gcp: 50,
-        },
+        } as Record<AnalysisPlatform, number>,
       };
+
+      // Cache error result with shorter TTL (5 minutes)
+      if (useCache) {
+        const cache = getFrameworkCache();
+        cache.set(repoPath, result, 5 * 60 * 1000);
+      }
+
+      return result;
     }
+  }
+
+  /**
+   * Invalidates cache for a repository
+   * Useful when repository has been updated
+   * 
+   * @param repoPath - Repository path
+   */
+  static invalidateCache(repoPath: string): void {
+    const cache = getFrameworkCache();
+    cache.invalidate(repoPath);
+  }
+
+  /**
+   * Clears all cached framework detections
+   */
+  static clearCache(): void {
+    const cache = getFrameworkCache();
+    cache.clear();
   }
 }

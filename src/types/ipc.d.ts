@@ -1,11 +1,28 @@
 /**
  * IPC Channel Types for Send-It
+ * 
+ * Unified platform types for deployment platforms
  */
 
-export type Platform = 'vercel' | 'railway' | 'render';
+/**
+ * Supported deployment platforms
+ */
+export type DeployPlatform = 'vercel' | 'railway' | 'render';
+
+/**
+ * Legacy type alias for backwards compatibility
+ * @deprecated Use DeployPlatform instead
+ */
+export type Platform = DeployPlatform;
+
+/**
+ * Framework analysis platforms (for scoring/recommendations)
+ * These are the platforms that can be recommended, not all are supported for deployment
+ */
+export type AnalysisPlatform = 'vercel' | 'netlify' | 'cloudflare' | 'aws' | 'azure' | 'gcp';
 
 export interface DeployConfig {
-  platform: Platform;
+  platform: DeployPlatform;
   repoPath: string;
   envVars: Record<string, string>;
   projectName?: string;
@@ -17,7 +34,7 @@ export interface DeployResult {
   deploymentId?: string;
   url?: string;
   error?: string;
-  platform: Platform;
+  platform: DeployPlatform;
 }
 
 export interface DeployStatus {
@@ -26,13 +43,21 @@ export interface DeployStatus {
   url?: string;
   logs: string[];
   progress?: number;
-  platform: Platform;
+  platform: DeployPlatform;
 }
 
 export interface TokenResult {
   success: boolean;
   token?: string;
   error?: string;
+}
+
+/**
+ * Framework detection result
+ */
+export interface FrameworkDetectionResult {
+  framework: string;
+  scores: Record<AnalysisPlatform, number>;
 }
 
 export interface QueueItem {

@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import type { CloneResult, FrameworkAnalysisResult } from '../electron';
+import type { AnalysisPlatform, DeployPlatform } from '../../types/ipc';
 
-export type Platform = 'vercel' | 'netlify' | 'cloudflare' | 'aws' | 'azure' | 'gcp';
+// For framework analysis recommendations
+export type Platform = AnalysisPlatform;
 
 export interface WizardState {
   currentStep: number;
