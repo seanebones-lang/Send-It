@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useWizard } from '../contexts/WizardContext';
-import { useElectron } from '../hooks/useElectron';
-import { GitBranch, Loader2, AlertCircle } from 'lucide-react';
+import { useRepositoryAnalysis } from '../hooks/useRepositoryAnalysis';
+import { GitBranch, Loader2, AlertCircle, RefreshCw, Clock } from 'lucide-react';
+import { SkeletonLoader } from './SkeletonLoader';
 
 const repoUrlSchema = z.object({
   repoUrl: z
@@ -20,12 +21,13 @@ const repoUrlSchema = z.object({
 type RepoUrlForm = z.infer<typeof repoUrlSchema>;
 
 export function StepRepo() {
-  const { state, setRepoUrl, setCloneResult, setAnalysisResult, setLoading, setError, nextStep } = useWizard();
-  const { cloneRepo, analyzeFramework, isAvailable } = useElectron();
+  const { state, setRepoUrl, setCloneResult, setAnalysisResult, setError, nextStep } = useWizard();
+  const [inputRepoUrl, setInputRepoUrl] = React.useState(state.repoUrl || '');
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<RepoUrlForm>({
     resolver: zodResolver(repoUrlSchema),
@@ -34,49 +36,43 @@ export function StepRepo() {
     },
   });
 
-  const onSubmit = async (data: RepoUrlForm) => {
-    if (!isAvailable) {
-      setError('Electron API not available');
-      return;
+  const watchedUrl = watch('repoUrl');
+  const { data, isLoading, isError, error, refetch, isFetching } = useRepositoryAnalysis(
+    watchedUrl || null
+  );
+
+  // Update wizard state when query succeeds
+  useEffect(() => {
+    if (data && data.analysisResult) {
+      setRepoUrl(watchedUrl || '');
+      setCloneResult(data.cloneResult);
+      setAnalysisResult(data.analysisResult);
+      setError(null);
     }
+  }, [data, watchedUrl, setRepoUrl, setCloneResult, setAnalysisResult, setError]);
 
-    setError(null);
-    setLoading(true);
-    setRepoUrl(data.repoUrl);
+  // Update error state when query fails
+  useEffect(() => {
+    if (isError && error) {
+      setError(error instanceof Error ? error.message : 'Failed to analyze repository');
+    }
+  }, [isError, error, setError]);
 
-    try {
-      // Clone repository
-      const cloneResult = await cloneRepo(data.repoUrl);
-      setCloneResult(cloneResult);
-
-      if (!cloneResult.success) {
-        setError(cloneResult.error || 'Failed to clone repository');
-        setLoading(false);
-        return;
-      }
-
-      if (!cloneResult.path) {
-        setError('Clone succeeded but no path returned');
-        setLoading(false);
-        return;
-      }
-
-      // Analyze framework
-      const analysisResult = await analyzeFramework(cloneResult.path, data.repoUrl);
-      setAnalysisResult(analysisResult);
-
-      if (!analysisResult.success) {
-        setError(analysisResult.error || 'Failed to analyze framework');
-        setLoading(false);
-        return;
-      }
-
-      // Move to next step
+  const onSubmit = async (formData: RepoUrlForm) => {
+    setInputRepoUrl(formData.repoUrl);
+    // Trigger the query if not already running
+    if (!isLoading && !isFetching) {
+      await refetch();
+    }
+    // If we have cached query data, move to next step immediately
+    if (data?.analysisResult?.success) {
       nextStep();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unknown error occurred');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleContinue = () => {
+    if (data?.analysisResult?.success) {
+      nextStep();
     }
   };
 
@@ -119,49 +115,81 @@ export function StepRepo() {
           )}
         </div>
 
-        {state.error && (
+        {/* Loading State */}
+        {(isLoading || isFetching) && (
+          <div className="space-y-4">
+            <SkeletonLoader className="h-12 w-full" />
+            <SkeletonLoader className="h-24 w-full" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {(isError || state.error) && (
           <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {state.error}
-            </p>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800 dark:text-red-300">Analysis Failed</p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  {error instanceof Error ? error.message : state.error || 'Failed to analyze repository'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Retry
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {state.cloneResult?.success && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <p className="text-sm text-green-600 dark:text-green-400">
-              ✓ Repository cloned successfully to: {state.cloneResult.path}
-            </p>
+        {/* Success State */}
+        {data && data.cloneResult?.success && data.analysisResult?.success && (
+          <div className="space-y-3">
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-sm text-green-600 dark:text-green-400">
+                ✓ Repository cloned successfully to: {data.cloneResult.path}
+              </p>
+            </div>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                ✓ Framework detected: <span className="font-semibold">{data.analysisResult.framework}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              Continue to Analysis
+            </button>
           </div>
         )}
 
-        {state.analysisResult?.success && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              ✓ Framework detected: <span className="font-semibold">{state.analysisResult.framework}</span>
-            </p>
-          </div>
+        {/* Submit Button - Only show if no data yet */}
+        {!data && (
+          <button
+            type="submit"
+            disabled={isSubmitting || isLoading || isFetching}
+            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            aria-busy={isSubmitting || isLoading || isFetching}
+          >
+            {isSubmitting || isLoading || isFetching ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <GitBranch className="w-5 h-5" />
+                Clone & Analyze
+              </>
+            )}
+          </button>
         )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting || state.loading}
-          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-          aria-busy={isSubmitting || state.loading}
-        >
-          {isSubmitting || state.loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <GitBranch className="w-5 h-5" />
-              Clone & Analyze
-            </>
-          )}
-        </button>
       </form>
     </div>
   );

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useWizard } from '../contexts/WizardContext';
 import { CheckCircle, XCircle, TrendingUp, ArrowRight } from 'lucide-react';
 import type { Platform } from '../contexts/WizardContext';
+import { PlatformTable, type PlatformRow } from './PlatformTable';
+import { SkeletonLoader, PlatformCardSkeleton } from './SkeletonLoader';
 
 const platformNames: Record<Platform, string> = {
   vercel: 'Vercel',
@@ -48,9 +50,39 @@ export function StepAnalysis() {
   );
 
   const recommendedPlatform = sortedPlatforms[0][0];
+  
+  // Transform to PlatformRow format for table
+  const platformRows: PlatformRow[] = useMemo(() => {
+    return sortedPlatforms.map(([platform, score]) => ({
+      platform,
+      score,
+      features: getPlatformFeatures(platform, score),
+      recommended: score >= 90,
+    }));
+  }, [sortedPlatforms]);
+
   const excellentPlatforms = sortedPlatforms.filter(([, score]) => score >= 90);
   const goodPlatforms = sortedPlatforms.filter(([, score]) => score >= 70 && score < 90);
   const fairPlatforms = sortedPlatforms.filter(([, score]) => score < 70);
+
+  // Helper function to get platform features
+  function getPlatformFeatures(platform: Platform, score: number): string[] {
+    const features: string[] = [];
+    if (platform === 'vercel') {
+      features.push('SSR', 'CDN', 'Edge Functions');
+    } else if (platform === 'netlify') {
+      features.push('JAMstack', 'Functions', 'Forms');
+    } else if (platform === 'cloudflare') {
+      features.push('CDN', 'Workers', 'Pages');
+    } else if (platform === 'aws') {
+      features.push('S3', 'CloudFront', 'Lambda');
+    } else if (platform === 'azure') {
+      features.push('Static Web Apps', 'Functions');
+    } else if (platform === 'gcp') {
+      features.push('Cloud Run', 'Cloud Storage');
+    }
+    return features;
+  }
 
   const handlePlatformSelect = (platform: Platform) => {
     setSelectedPlatform(platform);
@@ -78,113 +110,18 @@ export function StepAnalysis() {
         </p>
       </div>
 
-      {/* Recommended Platform */}
-      {excellentPlatforms.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-            Recommended
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {excellentPlatforms.map(([platform, score]) => (
-              <button
-                key={platform}
-                onClick={() => handlePlatformSelect(platform)}
-                className={`p-6 rounded-lg border-2 ${
-                  state.selectedPlatform === platform
-                    ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                } bg-white dark:bg-gray-800 transition-all text-left`}
-                aria-pressed={state.selectedPlatform === platform}
-                aria-label={`Select ${platformNames[platform]} platform (score: ${score})`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${platformColors[platform]}`}>
-                    {platformNames[platform]}
-                  </span>
-                  {getScoreIcon(score)}
-                </div>
-                <div className="mt-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-2xl font-bold ${getScoreColor(score)}`}>{score}</span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">/ 100</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        score >= 90 ? 'bg-green-500' : score >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${score}%` }}
-                    />
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Good Platforms */}
-      {goodPlatforms.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Good Options</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {goodPlatforms.map(([platform, score]) => (
-              <button
-                key={platform}
-                onClick={() => handlePlatformSelect(platform)}
-                className={`p-4 rounded-lg border ${
-                  state.selectedPlatform === platform
-                    ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                } bg-white dark:bg-gray-800 transition-all text-left`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {platformNames[platform]}
-                  </span>
-                  {getScoreIcon(score)}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">/ 100</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Fair Platforms */}
-      {fairPlatforms.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Other Options</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {fairPlatforms.map(([platform, score]) => (
-              <button
-                key={platform}
-                onClick={() => handlePlatformSelect(platform)}
-                className={`p-4 rounded-lg border ${
-                  state.selectedPlatform === platform
-                    ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                } bg-white dark:bg-gray-800 transition-all text-left`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {platformNames[platform]}
-                  </span>
-                  {getScoreIcon(score)}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">/ 100</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Platform Comparison Table */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+          Platform Recommendations
+        </h3>
+        <PlatformTable
+          data={platformRows}
+          selectedPlatform={state.selectedPlatform}
+          onSelect={handlePlatformSelect}
+        />
+      </div>
 
       {/* Navigation */}
       <div className="flex justify-between mt-8">

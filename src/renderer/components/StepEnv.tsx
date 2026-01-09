@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useWizard } from '../contexts/WizardContext';
 import { useElectron } from '../hooks/useElectron';
 import { Plus, Trash2, ArrowLeft, CheckCircle, Info, Lock, Key, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { VirtualizedEnvList, type EnvField } from './VirtualizedEnvList';
 
 // Dynamic schema based on platform
 const getEnvSchema = (platform: string) => {
@@ -128,6 +129,7 @@ export function StepEnv() {
     formState: { errors },
     setValue,
   } = useForm<EnvForm>({
+    // @ts-ignore - setValue is used in VirtualizedEnvList
     resolver: zodResolver(schema),
     defaultValues: {
       customVars: [],
@@ -333,81 +335,112 @@ export function StepEnv() {
             </button>
           </div>
 
-          <div className="space-y-4">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+          {/* Use virtualized list for better performance with many variables */}
+          {fields.length > 10 ? (
+            <VirtualizedEnvList
+              fields={fields.map((field, index) => ({
+                id: field.id,
+                key: field.key || '',
+                value: field.value || '',
+                description: field.description || '',
+                isPassword: true,
+              }))}
+              onRemove={(id) => {
+                const index = fields.findIndex((f) => f.id === id);
+                if (index !== -1) remove(index);
+              }}
+              onUpdate={(id, updates) => {
+                const index = fields.findIndex((f) => f.id === id);
+                if (index !== -1) {
+                  // Update via react-hook-form setValue
+                  Object.entries(updates).forEach(([key, value]) => {
+                    if (key !== 'id' && value !== undefined) {
+                      setValue(`customVars.${index}.${key}` as any, value as string);
+                    }
+                  });
+                }
+              }}
+              register={register}
+              errors={errors}
+            />
+          ) : (
+            // Fallback to regular list for small numbers
+            <div className="space-y-4">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                    <div>
+                      <label
+                        htmlFor={`customVars.${index}.key`}
+                        className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
+                      >
+                        Key
+                      </label>
+                      <input
+                        id={`customVars.${index}.key`}
+                        {...register(`customVars.${index}.key`)}
+                        placeholder="VARIABLE_NAME"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {errors.customVars?.[index]?.key && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          {errors.customVars[index]?.key?.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`customVars.${index}.value`}
+                        className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2"
+                      >
+                        <Lock className="w-3 h-3" />
+                        Value (encrypted)
+                      </label>
+                      <input
+                        id={`customVars.${index}.value`}
+                        type="password"
+                        {...register(`customVars.${index}.value`)}
+                        placeholder="value (will be encrypted)"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {errors.customVars?.[index]?.value && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          {errors.customVars[index]?.value?.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
                   <div>
                     <label
-                      htmlFor={`customVars.${index}.key`}
+                      htmlFor={`customVars.${index}.description`}
                       className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
                     >
-                      Key
+                      Description (optional)
                     </label>
                     <input
-                      id={`customVars.${index}.key`}
-                      {...register(`customVars.${index}.key`)}
-                      placeholder="VARIABLE_NAME"
+                      id={`customVars.${index}.description`}
+                      {...register(`customVars.${index}.description`)}
+                      placeholder="What this variable is used for"
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    {errors.customVars?.[index]?.key && (
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {errors.customVars[index]?.key?.message}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor={`customVars.${index}.value`}
-                      className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2"
-                    >
-                      <Lock className="w-3 h-3" />
-                      Value (encrypted)
-                    </label>
-                    <input
-                      id={`customVars.${index}.value`}
-                      type="password"
-                      {...register(`customVars.${index}.value`)}
-                      placeholder="value (will be encrypted)"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    {errors.customVars?.[index]?.value && (
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {errors.customVars[index]?.value?.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={() => remove(index)}
-                      className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Remove
-                    </button>
                   </div>
                 </div>
-                <div>
-                  <label
-                    htmlFor={`customVars.${index}.description`}
-                    className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
-                  >
-                    Description (optional)
-                  </label>
-                  <input
-                    id={`customVars.${index}.description`}
-                    {...register(`customVars.${index}.description`)}
-                    placeholder="What this variable is used for"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
