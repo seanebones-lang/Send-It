@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "buildCommand": "echo 'Using pre-built files' && exit 0",
+  "outputDirectory": "dist",
+  "installCommand": "echo 'Skipping install - using pre-built files' && exit 0",
+  "framework": null,
+  "routes": [
+    {
+      "src": "/js/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

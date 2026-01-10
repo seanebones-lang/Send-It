@@ -71,6 +71,19 @@ jest.mock('crypto', () => {
   };
 });
 
+// Mock better-sqlite3 globally to prevent worker process issues
+jest.mock('better-sqlite3', () => {
+  return jest.fn().mockImplementation(() => ({
+    exec: jest.fn(),
+    prepare: jest.fn(() => ({
+      run: jest.fn(),
+      get: jest.fn(),
+      all: jest.fn(() => []),
+    })),
+    close: jest.fn(),
+  }));
+});
+
 // Suppress console errors in tests (optional - remove if you want to see them)
 // global.console = {
 //   ...console,

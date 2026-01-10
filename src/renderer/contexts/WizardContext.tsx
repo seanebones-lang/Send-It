@@ -12,7 +12,14 @@ export interface WizardState {
   cloneResult: CloneResult | null;
   analysisResult: FrameworkAnalysisResult | null;
   selectedPlatform: Platform | null;
+  selectedDeployPlatform: string | null; // DeployPlatform ID (vercel, netlify, etc.)
   envVars: Record<string, string>;
+  projectName?: string;
+  branch?: string;
+  framework?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  rootDirectory?: string;
   loading: boolean;
   error: string | null;
 }
@@ -23,7 +30,11 @@ export interface WizardContextType {
   setCloneResult: (result: CloneResult) => void;
   setAnalysisResult: (result: FrameworkAnalysisResult) => void;
   setSelectedPlatform: (platform: Platform) => void;
+  setSelectedDeployPlatform: (platform: string) => void;
   setEnvVar: (key: string, value: string) => void;
+  setProjectName: (name: string) => void;
+  setBranch: (branch: string) => void;
+  setFramework: (framework: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   nextStep: () => void;
@@ -39,7 +50,14 @@ const initialState: WizardState = {
   cloneResult: null,
   analysisResult: null,
   selectedPlatform: null,
+  selectedDeployPlatform: null,
   envVars: {},
+  projectName: undefined,
+  branch: undefined,
+  framework: undefined,
+  buildCommand: undefined,
+  startCommand: undefined,
+  rootDirectory: undefined,
   loading: false,
   error: null,
 };
@@ -69,11 +87,27 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, selectedPlatform: platform }));
   };
 
+  const setSelectedDeployPlatform = (platform: string) => {
+    setState((prev) => ({ ...prev, selectedDeployPlatform: platform }));
+  };
+
   const setEnvVar = (key: string, value: string) => {
     setState((prev) => ({
       ...prev,
       envVars: { ...prev.envVars, [key]: value },
     }));
+  };
+
+  const setProjectName = (name: string) => {
+    setState((prev) => ({ ...prev, projectName: name }));
+  };
+
+  const setBranch = (branch: string) => {
+    setState((prev) => ({ ...prev, branch }));
+  };
+
+  const setFramework = (framework: string) => {
+    setState((prev) => ({ ...prev, framework }));
   };
 
   const setLoading = (loading: boolean) => {
@@ -87,7 +121,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const nextStep = () => {
     setState((prev) => ({
       ...prev,
-      currentStep: Math.min(prev.currentStep + 1, 2),
+      currentStep: Math.min(prev.currentStep + 1, 4), // 5 steps: 0-4
       error: null,
     }));
   };
@@ -103,7 +137,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const goToStep = (step: number) => {
     setState((prev) => ({
       ...prev,
-      currentStep: Math.max(0, Math.min(step, 2)),
+      currentStep: Math.max(0, Math.min(step, 4)), // 5 steps: 0-4
       error: null,
     }));
   };
@@ -120,7 +154,11 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         setCloneResult,
         setAnalysisResult,
         setSelectedPlatform,
+        setSelectedDeployPlatform,
         setEnvVar,
+        setProjectName,
+        setBranch,
+        setFramework,
         setLoading,
         setError,
         nextStep,

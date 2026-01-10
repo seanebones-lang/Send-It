@@ -117,16 +117,43 @@ describe('TokenService', () => {
 
   describe('authenticateOAuth', () => {
     it('should handle OAuth authentication', async () => {
-      // OAuth flow is complex and involves opening a browser window
-      // For now, test that it calls the internal method
-      // In a real test, you'd mock the BrowserWindow more thoroughly
+      // Mock BrowserWindow to trigger 'closed' event after a short delay
+      const { BrowserWindow } = require('electron');
+      const mockWindow = {
+        loadURL: jest.fn(),
+        show: jest.fn(),
+        close: jest.fn(),
+        on: jest.fn((event: string, callback: () => void) => {
+          // Simulate window closing immediately for test
+          if (event === 'closed') {
+            setTimeout(() => callback(), 10);
+          }
+        }),
+        webContents: {
+          executeJavaScript: jest.fn().mockResolvedValue(undefined),
+          send: jest.fn(),
+          on: jest.fn((event: string, callback: () => void) => {
+            if (event === 'did-finish-load') {
+              setTimeout(() => callback(), 10);
+            }
+          }),
+        },
+      };
+      (BrowserWindow as jest.Mock).mockImplementation(() => mockWindow);
       
-      // This will fail with the current mock, but shows the structure
-      const result = await tokenService.authenticateOAuth('vercel');
+      const resultPromise = tokenService.authenticateOAuth('vercel');
+      
+      // Wait for the promise to resolve (should be quick due to mocked close event)
+      const result = await Promise.race([
+        resultPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Test timeout')), 5000)
+        ),
+      ]) as any;
       
       // OAuth currently returns manual token entry needed
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
-    });
+    }, 10000); // Increase timeout to 10 seconds
   });
 });

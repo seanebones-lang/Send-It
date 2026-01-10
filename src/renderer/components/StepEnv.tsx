@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useWizard } from '../contexts/WizardContext';
-import { useElectron } from '../hooks/useElectron';
+import { WebTokenService } from '../../services/WebTokenService';
 import { Plus, Trash2, ArrowLeft, CheckCircle, Info, Lock, Key, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { VirtualizedEnvList, type EnvField } from './VirtualizedEnvList';
 
@@ -89,31 +89,23 @@ const platformDescriptions: Record<string, Record<string, string>> = {
 
 export function StepEnv() {
   const { state, setEnvVar, prevStep, reset } = useWizard();
-  const { electronAPI, isAvailable } = useElectron();
-  const [keychainPermission, setKeychainPermission] = useState<boolean | null>(null);
-  const [oauthLoading, setOauthLoading] = useState<'vercel' | 'railway' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<'vercel' | 'netlify' | 'railway' | 'render' | null>(null);
   const [tokenStatus, setTokenStatus] = useState<Record<string, boolean>>({});
 
-  // Check keychain permission on mount
-  useEffect(() => {
-    if (isAvailable && electronAPI?.keychain?.check) {
-      electronAPI.keychain.check().then((result: any) => {
-        setKeychainPermission(result?.hasPermission ?? false);
-      });
-    }
-  }, [isAvailable, electronAPI]);
+  // Use WebTokenService (web-only, no Electron needed)
+  const tokenService = WebTokenService.getInstance();
 
-  // Check token status for platforms
+  // Check token status for platforms (web-only, from localStorage)
   useEffect(() => {
-    if (state.selectedPlatform && isAvailable && electronAPI?.token?.get) {
-      const platform = state.selectedPlatform === 'vercel' ? 'vercel' : state.selectedPlatform === 'railway' ? 'railway' : null;
-      if (platform) {
-        electronAPI.token.get(platform).then((result: any) => {
-          setTokenStatus((prev) => ({ ...prev, [platform]: result?.success ?? false }));
-        });
+    const checkTokens = async () => {
+      if (state.selectedDeployPlatform) {
+        const platform = state.selectedDeployPlatform as 'vercel' | 'netlify' | 'railway' | 'render';
+        const result = await tokenService.hasToken(platform);
+        setTokenStatus((prev) => ({ ...prev, [platform]: result }));
       }
-    }
-  }, [state.selectedPlatform, isAvailable, electronAPI]);
+    };
+    checkTokens();
+  }, [state.selectedDeployPlatform]);
 
   const schema = useMemo(() => {
     if (!state.selectedPlatform) return z.object({});
@@ -142,14 +134,11 @@ export function StepEnv() {
     name: 'customVars',
   });
 
-  const handleOAuth = async (platform: 'vercel' | 'railway') => {
-    if (!electronAPI?.token?.oauth) {
-      return;
-    }
-
+  const handleOAuth = async (platform: 'vercel' | 'netlify' | 'railway' | 'render') => {
     setOauthLoading(platform);
     try {
-      const result = await electronAPI.token.oauth(platform);
+      // Use WebTokenService for OAuth (browser popup, no Electron needed)
+      const result = await tokenService.authenticateOAuth(platform);
       if (result?.success) {
         setTokenStatus((prev) => ({ ...prev, [platform]: true }));
         // Set token field as authenticated
@@ -157,6 +146,10 @@ export function StepEnv() {
           setValue('VERCEL_TOKEN', '***authenticated***' as any);
         } else if (platform === 'railway') {
           setValue('RAILWAY_TOKEN', '***authenticated***' as any);
+        } else if (platform === 'netlify') {
+          setValue('NETLIFY_TOKEN', '***authenticated***' as any);
+        } else if (platform === 'render') {
+          setValue('RENDER_API_KEY', '***authenticated***' as any);
         }
       } else {
         alert(`OAuth failed: ${result?.error || 'Unknown error'}`);

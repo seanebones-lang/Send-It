@@ -5,9 +5,10 @@
  */
 
 /**
- * Supported deployment platforms
+ * Supported deployment platforms (web-only)
+ * All platforms call APIs directly from browser - no backend needed!
  */
-export type DeployPlatform = 'vercel' | 'railway' | 'render';
+export type DeployPlatform = 'vercel' | 'railway' | 'render' | 'netlify' | 'fly-io' | 'cloudflare-pages';
 
 /**
  * Legacy type alias for backwards compatibility
@@ -23,10 +24,15 @@ export type AnalysisPlatform = 'vercel' | 'netlify' | 'cloudflare' | 'aws' | 'az
 
 export interface DeployConfig {
   platform: DeployPlatform;
-  repoPath: string;
+  repoPath: string; // GitHub URL or github://owner/repo format
+  repoUrl?: string; // Full GitHub URL (for clarity)
   envVars: Record<string, string>;
   projectName?: string;
   branch?: string;
+  framework?: string; // Detected framework
+  buildCommand?: string; // Optional build command
+  startCommand?: string; // Optional start command (for Render)
+  rootDirectory?: string; // Optional root directory
 }
 
 export interface DeployResult {

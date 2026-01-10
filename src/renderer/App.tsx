@@ -3,17 +3,23 @@ import { WizardProvider, useWizard } from './contexts/WizardContext';
 import { StepRepo } from './components/StepRepo';
 import { StepAnalysis } from './components/StepAnalysis';
 import { StepEnv } from './components/StepEnv';
+import { Step2PlatformDiscovery } from '../../components/DeploymentWizard/Step2PlatformDiscovery';
+import { Step5Deploy } from '../../components/DeploymentWizard/Step5Deploy';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Circle, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import type { DeployConfig, DeployPlatform } from '../../types/ipc';
 
 const steps = [
   { id: 0, name: 'Repository', component: StepRepo },
   { id: 1, name: 'Analysis', component: StepAnalysis },
-  { id: 2, name: 'Environment', component: StepEnv },
+  { id: 2, name: 'Platform', component: Step2PlatformDiscovery },
+  { id: 3, name: 'Environment', component: StepEnv },
+  { id: 4, name: 'Deploy', component: Step5Deploy },
 ];
 
 function WizardContent() {
-  const { state } = useWizard();
+  const wizard = useWizard();
+  const { state } = wizard;
   const [darkMode, setDarkMode] = useState(true);
   const CurrentStep = steps[state.currentStep].component;
 
@@ -26,75 +32,110 @@ function WizardContent() {
   }, [darkMode]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
-      <header className="p-6 shadow-md dark:shadow-gray-800 bg-gray-50 dark:bg-gray-800" role="banner">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Send-It</h1>
+    <div style={{ minHeight: '100vh', backgroundColor: '#1f2937', color: 'white', padding: '24px' }}>
+      <header role="banner" style={{ padding: '24px', backgroundColor: '#374151', borderRadius: '8px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Send-It</h1>
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{ 
+              padding: '8px 16px', 
+              borderRadius: '8px', 
+              backgroundColor: '#4b5563',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer'
+            }}
           >
             {darkMode ? '☀️ Light' : '🌙 Dark'}
           </button>
         </div>
       </header>
 
-      <main className="p-6">
+      <main role="main">
         {/* Step Indicator */}
-        <nav className="max-w-4xl mx-auto mb-8" aria-label="Wizard steps">
-          <ol className="flex items-center justify-between" role="list">
+        <nav style={{ maxWidth: '800px', margin: '0 auto 32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {steps.map((step, index) => (
               <React.Fragment key={step.id}>
-                <li className="flex items-center" role="listitem">
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                   <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-                      state.currentStep > step.id
-                        ? 'bg-green-500 border-green-500 text-white'
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      backgroundColor: state.currentStep > step.id
+                        ? '#22c55e'
                         : state.currentStep === step.id
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
-                    }`}
-                    aria-current={state.currentStep === step.id ? 'step' : undefined}
-                    aria-label={`Step ${step.id + 1}: ${step.name}${state.currentStep > step.id ? ' (completed)' : ''}`}
+                        ? '#2563eb'
+                        : '#4b5563',
+                      color: 'white',
+                      fontWeight: 'bold'
+                    }}
                   >
                     {state.currentStep > step.id ? (
-                      <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
+                      <CheckCircle2 style={{ width: '24px', height: '24px' }} />
                     ) : (
-                      <span className="font-semibold" aria-hidden="true">{step.id + 1}</span>
+                      <span>{step.id + 1}</span>
                     )}
                   </div>
-                  <div className="ml-3 hidden sm:block">
-                    <p
-                      className={`text-sm font-medium ${
-                        state.currentStep >= step.id
-                          ? 'text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-gray-400'
-                      }`}
-                    >
-                      {step.name}
-                    </p>
-                  </div>
-                </li>
+                  <span style={{ marginLeft: '12px', fontWeight: '500' }}>
+                    {step.name}
+                  </span>
+                </div>
                 {index < steps.length - 1 && (
-                  <li
-                    className={`flex-1 h-0.5 mx-4 ${
-                      state.currentStep > step.id
-                        ? 'bg-green-500'
-                        : 'bg-gray-200 dark:bg-gray-700'
-                    }`}
-                    role="separator"
-                    aria-hidden="true"
+                  <div
+                    style={{
+                      flex: 1,
+                      height: '2px',
+                      margin: '0 16px',
+                      backgroundColor: state.currentStep > step.id ? '#22c55e' : '#4b5563'
+                    }}
                   />
                 )}
               </React.Fragment>
             ))}
-          </ol>
+          </div>
         </nav>
 
         {/* Current Step */}
-        <div className="max-w-4xl mx-auto">
-          <CurrentStep />
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          {state.currentStep === 2 ? (
+            <Step2PlatformDiscovery
+              detectedFramework={state.analysisResult?.framework}
+              selectedPlatform={state.selectedDeployPlatform || undefined}
+              onSelect={(platformId) => {
+                wizard.setSelectedDeployPlatform(platformId);
+              }}
+              onNext={() => wizard.nextStep()}
+              onBack={() => wizard.prevStep()}
+            />
+          ) : state.currentStep === 4 ? (
+            <Step5Deploy
+              deploymentConfig={{
+                platform: (state.selectedDeployPlatform || 'vercel') as DeployPlatform,
+                repoPath: state.repoPath || state.repoUrl || '',
+                repoUrl: state.repoUrl,
+                envVars: state.envVars,
+                projectName: state.projectName,
+                branch: state.branch || 'main',
+                framework: state.framework || state.analysisResult?.framework,
+                buildCommand: state.buildCommand,
+                startCommand: state.startCommand,
+                rootDirectory: state.rootDirectory,
+              }}
+              onDeploymentComplete={(result) => {
+                console.log('Deployment complete:', result);
+                // Could navigate to success screen or reset
+              }}
+              onBack={() => wizard.prevStep()}
+            />
+          ) : (
+            <CurrentStep />
+          )}
         </div>
       </main>
     </div>
@@ -105,7 +146,6 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        // Log error for monitoring (could send to error tracking service)
         console.error('Application error:', error, errorInfo);
       }}
     >

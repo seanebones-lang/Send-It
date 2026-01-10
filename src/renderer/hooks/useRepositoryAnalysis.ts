@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useElectron } from './useElectron';
+import { cloneRepoBrowser, analyzeFrameworkBrowser } from '../../renderer/api/browserAPI';
 import type { CloneResult, FrameworkAnalysisResult } from '../electron';
 
 export interface RepositoryAnalysisResult {
@@ -9,7 +9,6 @@ export interface RepositoryAnalysisResult {
 }
 
 export function useRepositoryAnalysis(repoUrl: string | null) {
-  const { cloneRepo, analyzeFramework } = useElectron();
   const queryClient = useQueryClient();
 
   // Prefetch when URL changes (debounced)
@@ -19,14 +18,15 @@ export function useRepositoryAnalysis(repoUrl: string | null) {
         queryClient.prefetchQuery({
           queryKey: ['repository', 'analysis', repoUrl],
           queryFn: async () => {
-            const cloneResult = await cloneRepo(repoUrl);
+            // Use browser API (web-only, no Electron needed)
+            const cloneResult = await cloneRepoBrowser(repoUrl);
             if (!cloneResult.success) {
               throw new Error(cloneResult.error || 'Failed to clone repository');
             }
             if (!cloneResult.path) {
               throw new Error('Clone succeeded but no path returned');
             }
-            const analysisResult = await analyzeFramework(cloneResult.path, repoUrl);
+            const analysisResult = await analyzeFrameworkBrowser(cloneResult.path, repoUrl);
             if (!analysisResult.success) {
               throw new Error(analysisResult.error || 'Failed to analyze framework');
             }
@@ -36,14 +36,15 @@ export function useRepositoryAnalysis(repoUrl: string | null) {
       }, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [repoUrl, queryClient, cloneRepo, analyzeFramework]);
+  }, [repoUrl, queryClient]);
 
   return useQuery<RepositoryAnalysisResult>({
     queryKey: ['repository', 'analysis', repoUrl],
     queryFn: async () => {
       if (!repoUrl) return null as any;
       
-      const cloneResult = await cloneRepo(repoUrl);
+      // Use browser API (web-only, no Electron needed)
+      const cloneResult = await cloneRepoBrowser(repoUrl);
       if (!cloneResult.success) {
         throw new Error(cloneResult.error || 'Failed to clone repository');
       }
@@ -51,7 +52,7 @@ export function useRepositoryAnalysis(repoUrl: string | null) {
         throw new Error('Clone succeeded but no path returned');
       }
       
-      const analysisResult = await analyzeFramework(cloneResult.path, repoUrl);
+      const analysisResult = await analyzeFrameworkBrowser(cloneResult.path, repoUrl);
       if (!analysisResult.success) {
         throw new Error(analysisResult.error || 'Failed to analyze framework');
       }

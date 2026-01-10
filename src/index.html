@@ -1,15 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Send-It</title>
     <!-- Strict CSP for production, relaxed for development -->
-    <!-- In production, use nonce-based CSP instead of 'unsafe-inline' -->
     <meta 
       http-equiv="Content-Security-Policy" 
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.vercel.com https://api.railway.app https://api.render.com;" 
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.github.com https://api.vercel.com https://api.railway.app https://api.render.com;" 
     />
+    <style>
+      /* Prevent white flash on load */
+      html, body, #root {
+        background-color: #111827;
+        min-height: 100vh;
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

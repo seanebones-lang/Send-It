@@ -46,4 +46,6 @@ module.exports = {
       isolatedModules: true,
     },
   },
+  // Configure worker threads to prevent issues with native modules
+  maxWorkers: process.env.CI ? 2 : '50%',
 };
